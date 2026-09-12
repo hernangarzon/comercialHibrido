@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel Comercial Híbrido 24/7</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+</head>
+<body class="bg-gray-100 h-screen flex flex-col font-sans">
+
+  <!-- Modal de Login -->
+  <div id="login-modal" class="fixed inset-0 bg-slate-950/80 z-50 flex items-center justify-center">
+    <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 border border-gray-100">
+      <div class="text-center mb-6">
+        <div class="text-4xl mb-2">🤖</div>
+        <h2 class="text-2xl font-bold text-slate-800">Acceso Comercial</h2>
+        <p class="text-xs text-gray-500 mt-1">Ingresa con tus credenciales de empresa</p>
+      </div>
+      <form onsubmit="handleLogin(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-gray-700 mb-1">Correo Electrónico</label>
+          <input id="login-email" type="email" value="carlos@laboratoriodental.com" required class="w-full border rounded-lg px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-700 mb-1">Contraseña</label>
+          <input id="login-password" type="password" value="admin123" required class="w-full border rounded-lg px-3.5 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        </div>
+        <div id="login-error" class="text-xs text-red-600 font-semibold hidden text-center"></div>
+        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg text-sm transition shadow-md">Iniciar Sesión</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header class="bg-slate-900 text-white p-4 flex justify-between items-center shadow">
+    <h1 class="text-xl font-bold flex items-center gap-2">
+      🤖 Agente Comercial Híbrido
+      <span id="ws-status" class="text-xs bg-red-500 px-2 py-1 rounded-full">Desconectado</span>
+    </h1>
+    <div class="flex items-center gap-3">
+      <div id="user-info" class="text-right hidden">
+        <p id="user-name" class="text-xs font-bold text-white">Usuario</p>
+        <p id="user-company" class="text-[10px] text-blue-300">Empresa</p>
+      </div>
+      <button onclick="recargarActual()" class="bg-blue-600 hover:bg-blue-700 text-sm px-3.5 py-1.5 rounded font-semibold transition">Actualizar</button>
+      <button onclick="cerrarSesion()" class="bg-slate-800 hover:bg-red-600 text-xs px-3 py-1.5 rounded text-gray-300 hover:text-white transition">Salir</button>
+    </div>
+  </header>
+
+  <!-- Main Grid -->
+  <div class="flex flex-1 overflow-hidden">
+    
+    <!-- Sidebar: Lista de Conversaciones -->
+    <aside class="w-1/3 bg-white border-r border-gray-200 flex flex-col">
+      <!-- Tabs -->
+      <div class="p-3 bg-gray-50 border-b flex gap-1.5 overflow-x-auto">
+        <button id="tab-BOT_ACTIVO" onclick="cambiarPestana('BOT_ACTIVO')" class="text-xs font-semibold px-2.5 py-1.5 rounded bg-blue-600 text-white shadow-sm transition whitespace-nowrap">Bot Activo</button>
+        <button id="tab-ESCALADO_PENDIENTE" onclick="cambiarPestana('ESCALADO_PENDIENTE')" class="text-xs font-semibold px-2.5 py-1.5 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 transition whitespace-nowrap">Escalados</button>
+        <button id="tab-HUMANO_CONTROL" onclick="cambiarPestana('HUMANO_CONTROL')" class="text-xs font-semibold px-2.5 py-1.5 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 transition whitespace-nowrap">En Atención</button>
+        <button id="tab-ARCHIVADO" onclick="cambiarPestana('ARCHIVADO')" class="text-xs font-semibold px-2.5 py-1.5 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 transition whitespace-nowrap">Archivados</button>
+      </div>
+
+      <!-- Lista -->
+      <div id="lista-conversaciones" class="flex-1 overflow-y-auto divide-y divide-gray-100">
+        <p class="text-center text-gray-400 text-xs mt-10">Cargando conversaciones...</p>
+      </div>
+    </aside>
+
+    <!-- Chat View -->
+    <main class="flex-1 flex flex-col bg-slate-50">
+      <!-- Chat Header -->
+      <div id="chat-header" class="p-4 bg-white border-b border-gray-200 flex justify-between items-center hidden shadow-sm">
+        <div>
+          <h2 id="cliente-nombre" class="font-bold text-gray-800 text-base">Cliente</h2>
+          <p id="cliente-telefono" class="text-xs text-gray-500">+00 000 000</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span id="cliente-score" class="text-xs font-bold px-2.5 py-1 bg-amber-100 text-amber-800 rounded-full">Score: 0</span>
+          <button id="btn-tomar" onclick="tomarControl()" class="bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold px-3 py-1.5 rounded transition">Tomar Control</button>
+          <button id="btn-liberar" onclick="liberarControl()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 rounded hidden transition">Devolver al Bot</button>
+          <button id="btn-archivar" onclick="archivarChat()" class="bg-slate-600 hover:bg-slate-700 text-white text-xs font-semibold px-3 py-1.5 rounded transition">Archivar Caso</button>
+        </div>
+      </div>
+
+      <!-- Messages Area -->
+      <div id="chat-mensajes" class="flex-1 p-4 overflow-y-auto space-y-3">
+        <p class="text-center text-gray-400 text-sm mt-10">Selecciona una conversación de la izquierda para ver el historial.</p>
+      </div>
+
+      <!-- Message Input -->
+      <div id="chat-input-area" class="p-3 bg-white border-t border-gray-200 flex gap-2 hidden">
+        <input id="input-mensaje" type="text" placeholder="Escribe una respuesta manual al cliente..." class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" onkeydown="if(event.key==='Enter') enviarMensaje()">
+        <button onclick="enviarMensaje()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-semibold transition">Enviar</button>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    let conversacionActual = null;
+    let stompClient = null;
+    let estadoActual = 'BOT_ACTIVO';
+    let currentUser = null;
+
+    function getAuthToken() {
+      return localStorage.getItem('agent_token');
+    }
+
+    function getHeaders() {
+      const token = getAuthToken();
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = 'Bearer ' + token;
+      return headers;
+    }
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById('login-email').value;
+      const password = document.getElementById('login-password').value;
+      const errorDiv = document.getElementById('login-error');
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Credenciales inválidas');
+
+        localStorage.setItem('agent_token', data.token);
+        localStorage.setItem('agent_user', JSON.stringify(data));
+        document.getElementById('login-modal').classList.add('hidden');
+        mostrarUsuario(data);
+        conectarWS();
+        cambiarPestana('BOT_ACTIVO');
+      } catch (err) {
+        errorDiv.innerText = err.message;
+        errorDiv.classList.remove('hidden');
+      }
+    }
+
+    function mostrarUsuario(user) {
+      currentUser = user;
+      document.getElementById('user-info').classList.remove('hidden');
+      document.getElementById('user-name').innerText = user.name;
+      document.getElementById('user-company').innerText = user.companyName;
+    }
+
+    function cerrarSesion() {
+      localStorage.removeItem('agent_token');
+      localStorage.removeItem('agent_user');
+      location.reload();
+    }
+
+    function verificarSesion() {
+      const token = getAuthToken();
+      const userStr = localStorage.getItem('agent_user');
+      if (token && userStr) {
+        document.getElementById('login-modal').classList.add('hidden');
+        mostrarUsuario(JSON.parse(userStr));
+        conectarWS();
+        cambiarPestana('BOT_ACTIVO');
+      }
+    }
+
+    function conectarWS() {
+      const socket = new SockJS('/ws');
+      stompClient = Stomp.over(socket);
+      stompClient.debug = null;
+      stompClient.connect({}, function () {
+        document.getElementById('ws-status').className = 'text-xs bg-green-500 px-2 py-1 rounded-full font-semibold';
+        document.getElementById('ws-status').innerText = 'En vivo';
+        
+        stompClient.subscribe('/topic/conversaciones', function (mensaje) {
+          const evento = JSON.parse(mensaje.body);
+          alert('🔔 ¡Nueva alerta comercial! ID: ' + evento.conversationId);
+          recargarActual();
+        });
+      }, function () {
+        document.getElementById('ws-status').className = 'text-xs bg-red-500 px-2 py-1 rounded-full font-semibold';
+        document.getElementById('ws-status').innerText = 'Desconectado';
+        setTimeout(conectarWS, 5000);
+      });
+    }
+
+    function cambiarPestana(estado) {
+      estadoActual = estado;
+      ['BOT_ACTIVO', 'ESCALADO_PENDIENTE', 'HUMANO_CONTROL', 'ARCHIVADO'].forEach(tab => {
+        const btn = document.getElementById(`tab-${tab}`);
+        if (btn) {
+          if (tab === estado) {
+            btn.className = 'text-xs font-semibold px-2.5 py-1.5 rounded bg-blue-600 text-white shadow-sm transition whitespace-nowrap';
+          } else {
+            btn.className = 'text-xs font-semibold px-2.5 py-1.5 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 transition whitespace-nowrap';
+          }
+        }
+      });
+      cargarConversaciones(estadoActual);
+    }
+
+    function recargarActual() {
+      cargarConversaciones(estadoActual);
+      if (conversacionActual) {
+        cargarMensajes(conversacionActual.id);
+      }
+    }
+
+    async function cargarConversaciones(estado) {
+      try {
+        const res = await fetch(`/api/conversations?status=${estado}`, { headers: getHeaders() });
+        if (res.status === 401) { cerrarSesion(); return; }
+        const data = await res.json();
+        const lista = document.getElementById('lista-conversaciones');
+        lista.innerHTML = '';
+        
+        if (data.length === 0) {
+          lista.innerHTML = `<p class="text-center text-gray-400 text-xs mt-10">No hay conversaciones en <b>${estado}</b>.</p>`;
+          return;
+        }
+
+        data.forEach(conv => {
+          const item = document.createElement('div');
+          const isSelected = conversacionActual && conversacionActual.id === conv.id;
+          item.className = `p-3.5 hover:bg-blue-50 cursor-pointer transition border-b border-gray-100 ${isSelected ? 'bg-blue-50 border-l-4 border-l-blue-600' : ''}`;
+          item.onclick = () => seleccionarConversacion(conv);
+          item.innerHTML = `
+            <div class="flex justify-between items-center">
+              <span class="font-bold text-sm text-gray-800">${conv.customerName || conv.customerPhone}</span>
+              <span class="text-[11px] px-2 py-0.5 rounded-full font-semibold ${conv.leadScore >= 70 ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'}">Score: ${conv.leadScore}</span>
+            </div>
+            <p class="text-xs text-gray-500 truncate mt-1.5">${conv.lastMessage || 'Sin mensajes recientes'}</p>
+          `;
+          lista.appendChild(item);
+        });
+      } catch (err) {
+        console.error('Error cargando conversaciones:', err);
+      }
+    }
+
+    async function seleccionarConversacion(conv) {
+      conversacionActual = conv;
+      document.getElementById('chat-header').classList.remove('hidden');
+      document.getElementById('cliente-nombre').innerText = conv.customerName || 'Cliente';
+      document.getElementById('cliente-telefono').innerText = conv.customerPhone;
+      document.getElementById('cliente-score').innerText = `Score: ${conv.leadScore}`;
+
+      actualizarBotonesEstado(conv.status);
+      cargarMensajes(conv.id);
+    }
+
+    function actualizarBotonesEstado(status) {
+      const btnTomar = document.getElementById('btn-tomar');
+      const btnLiberar = document.getElementById('btn-liberar');
+      const inputArea = document.getElementById('chat-input-area');
+
+      if (status === 'HUMANO_CONTROL') {
+        btnTomar.classList.add('hidden');
+        btnLiberar.classList.remove('hidden');
+        inputArea.classList.remove('hidden');
+      } else {
+        btnTomar.classList.remove('hidden');
+        btnLiberar.classList.add('hidden');
+        inputArea.classList.add('hidden');
+      }
+    }
+
+    async function cargarMensajes(id) {
+      try {
+        const res = await fetch(`/api/conversations/${id}/mensajes`, { headers: getHeaders() });
+        const mensajes = await res.json();
+        const contenedor = document.getElementById('chat-mensajes');
+        contenedor.innerHTML = '';
+
+        mensajes.forEach(m => {
+          const msgDiv = document.createElement('div');
+          const esCliente = m.sender === 'CLIENTE';
+          msgDiv.className = `flex ${esCliente ? 'justify-start' : 'justify-end'}`;
+
+          let mediaHtml = '';
+          if (m.mediaType === 'IMAGE' && m.mediaId) {
+            mediaHtml = `
+              <div class="mt-2 mb-1">
+                <a href="/api/media/${m.mediaId}" target="_blank">
+                  <img src="/api/media/${m.mediaId}" alt="Comprobante" class="max-h-48 rounded-lg border border-gray-200 shadow-sm hover:opacity-90 transition cursor-pointer">
+                </a>
+              </div>
+            `;
+          } else if (m.mediaType === 'DOCUMENT' && m.mediaId) {
+            mediaHtml = `
+              <div class="mt-2 mb-1">
+                <a href="/api/media/${m.mediaId}" target="_blank" download="${m.mediaFilename || 'documento.pdf'}" class="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold rounded-lg border border-slate-300 transition shadow-sm">
+                  📄 Descargar ${m.mediaFilename || 'Documento PDF'}
+                </a>
+              </div>
+            `;
+          }
+
+          msgDiv.innerHTML = `
+            <div class="max-w-[75%] rounded-2xl px-4 py-2.5 text-sm shadow-sm ${
+              esCliente 
+                ? 'bg-white border border-gray-200 text-gray-800 rounded-bl-none' 
+                : m.sender === 'BOT'
+                  ? 'bg-blue-600 text-white rounded-br-none'
+                  : 'bg-emerald-600 text-white rounded-br-none'
+            }">
+              <div class="flex justify-between items-center gap-4 mb-1">
+                <span class="text-[10px] font-bold uppercase tracking-wider opacity-75">${m.sender}</span>
+                <span class="text-[10px] opacity-60">${new Date(m.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+              </div>
+              <p class="leading-relaxed whitespace-pre-wrap">${m.content}</p>
+              ${mediaHtml}
+            </div>
+          `;
+          contenedor.appendChild(msgDiv);
+        });
+        contenedor.scrollTop = contenedor.scrollHeight;
+      } catch (err) {
+        console.error('Error cargando mensajes:', err);
+      }
+    }
+
+    async function tomarControl() {
+      if (!conversacionActual) return;
+      await fetch(`/api/conversations/${conversacionActual.id}/tomar-control`, {
+        method: 'POST',
+        headers: getHeaders()
+      });
+      conversacionActual.status = 'HUMANO_CONTROL';
+      actualizarBotonesEstado('HUMANO_CONTROL');
+      cambiarPestana('HUMANO_CONTROL');
+    }
+
+    async function liberarControl() {
+      if (!conversacionActual) return;
+      await fetch(`/api/conversations/${conversacionActual.id}/liberar-control`, {
+        method: 'POST',
+        headers: getHeaders()
+      });
+      conversacionActual.status = 'BOT_ACTIVO';
+      actualizarBotonesEstado('BOT_ACTIVO');
+      cambiarPestana('BOT_ACTIVO');
+    }
+
+    async function archivarChat() {
+      if (!conversacionActual) return;
+      if (!confirm('¿Deseas archivar esta conversación?')) return;
+      
+      await fetch(`/api/conversations/${conversacionActual.id}/archivar`, {
+        method: 'POST',
+        headers: getHeaders()
+      });
+      conversacionActual.status = 'ARCHIVADO';
+      cambiarPestana('ARCHIVADO');
+    }
+
+    async function enviarMensaje() {
+      const input = document.getElementById('input-mensaje');
+      const texto = input.value.trim();
+      if (!texto || !conversacionActual) return;
+
+      await fetch(`/api/conversations/${conversacionActual.id}/mensajes`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ content: texto })
+      });
+      input.value = '';
+      setTimeout(() => cargarMensajes(conversacionActual.id), 500);
+    }
+
+    // Comprobar si ya había sesión abierta
+    verificarSesion();
+  </script>
+</body>
+</html>
