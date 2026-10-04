@@ -3,14 +3,14 @@ import { useEffect, useState } from 'react'
 // Enrutado mínimo por hash (#/bandeja?c=123): sin dependencias y compatible con
 // cualquier servidor estático, porque el backend solo sirve index.html en "/".
 
-export type Page = 'bandeja' | 'resultados' | 'bot' | 'ajustes' | 'solicitudes'
+export type Page = 'bandeja' | 'resultados' | 'bot' | 'ajustes' | 'plataforma'
 
 export interface Route {
   page: Page
   params: URLSearchParams
 }
 
-const PAGES: Page[] = ['bandeja', 'resultados', 'bot', 'ajustes', 'solicitudes']
+const PAGES: Page[] = ['bandeja', 'resultados', 'bot', 'ajustes', 'plataforma']
 
 function parse(): Route {
   const [path = '', query = ''] = window.location.hash.replace(/^#\/?/, '').split('?')

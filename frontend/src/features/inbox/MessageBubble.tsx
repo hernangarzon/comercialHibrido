@@ -23,6 +23,7 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
           <p className={clsx('mb-0.5 flex items-center gap-1 text-[11px] font-semibold', fromBot ? 'text-brand-100' : 'text-emerald-100')}>
             {fromBot && <Bot className="size-3" />}
             {fromBot ? 'Bot' : 'Asesor'}
+            {message.mediaType === 'TEMPLATE' && <span className="rounded bg-white/20 px-1 font-medium">Plantilla</span>}
           </p>
         )}
 
@@ -49,13 +50,23 @@ function DeliveryTicks({ status, error }: { status: DeliveryStatus | null; error
       return <Check className="size-3.5" aria-label="Enviado" />
     case 'FAILED':
       return (
-        <span title={error ?? 'No se pudo entregar'} className="inline-flex items-center gap-0.5 font-semibold text-red-100">
+        <span title={friendlyDeliveryError(error)} className="inline-flex items-center gap-0.5 font-semibold text-red-100">
           <AlertCircle className="size-3.5" /> No entregado
         </span>
       )
     default:
       return <Clock className="size-3" aria-label="Enviando" />
   }
+}
+
+/** Traduce los errores de entrega más comunes de Meta a algo accionable para el asesor. */
+function friendlyDeliveryError(error: string | null): string {
+  if (!error) return 'No se pudo entregar'
+  if (error.includes('131047') || /re-engagement/i.test(error)) {
+    return 'Pasaron más de 24 h desde el último mensaje del cliente: envía una plantilla aprobada.'
+  }
+  if (error.includes('131026')) return 'El número no tiene WhatsApp o no puede recibir el mensaje.'
+  return error
 }
 
 // Las URLs de blob se reutilizan entre renders para no descargar dos veces el mismo archivo.

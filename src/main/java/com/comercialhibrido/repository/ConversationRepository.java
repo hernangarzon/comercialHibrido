@@ -36,6 +36,8 @@ public interface ConversationRepository extends JpaRepository<Conversation, UUID
      */
     boolean existsByIdAndCompanyId(UUID id, UUID companyId);
 
+    long countByCompanyId(UUID companyId);
+
     /**
      * Empresa de una conversación, sin cargar la entidad (para enrutar eventos del panel).
      */

@@ -17,7 +17,7 @@ import java.io.IOException;
  *
  * Todo /api/** exige un JWT válido salvo el login y /api/public/** (landing).
  * Además del token se consulta el usuario en la base en cada petición: así una
- * cuenta desactivada o un cambio de rol se aplican de inmediato, sin esperar a
+ * cuenta desactivada, una empresa suspendida o un cambio de rol se aplican de inmediato, sin esperar a
  * que venza el token. Con contraseña temporal solo se permite /api/account/**.
  */
 @Component
@@ -49,8 +49,9 @@ public class PanelTokenFilter extends OncePerRequestFilter {
         JwtService.JwtPayload token = authHeader != null && authHeader.startsWith("Bearer ")
             ? jwtService.validarYExtraer(authHeader.substring(7))
             : null;
-        User user = token == null ? null : userRepository.findById(token.userId())
+        User user = token == null ? null : userRepository.findWithCompanyById(token.userId())
             .filter(User::isActive)
+            .filter(u -> u.getCompany().isActive())
             .filter(u -> u.getCompany().getId().equals(token.companyId()))
             .orElse(null);
 

@@ -24,8 +24,13 @@ public class Company {
     @Column(nullable = false, length = 100)
     private String name;
 
-    @Column(nullable = false, unique = true, length = 50)
+    /** Nulo mientras la empresa no conecta su número (alta reciente). */
+    @Column(unique = true, length = 50)
     private String whatsappPhoneNumberId;
+
+    /** Cuenta de WhatsApp Business (WABA): permite listar sus plantillas aprobadas. */
+    @Column(length = 50)
+    private String whatsappBusinessAccountId;
 
     @Column(length = 500)
     private String whatsappAccessToken;

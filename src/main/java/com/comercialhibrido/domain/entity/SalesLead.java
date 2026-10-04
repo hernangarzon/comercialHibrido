@@ -19,6 +19,8 @@ public class SalesLead {
     public static final String NUEVA = "NUEVA";
     public static final String CONTACTADA = "CONTACTADA";
     public static final String DESCARTADA = "DESCARTADA";
+    /** La solicitud se convirtió en una empresa cliente. */
+    public static final String CONVERTIDA = "CONVERTIDA";
 
     @Id
     @GeneratedValue

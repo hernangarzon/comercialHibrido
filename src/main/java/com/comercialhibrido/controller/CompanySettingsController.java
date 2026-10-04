@@ -10,6 +10,7 @@ import com.comercialhibrido.security.JwtService;
 import com.comercialhibrido.security.PanelTokenFilter;
 import com.comercialhibrido.security.Roles;
 import com.comercialhibrido.service.WhatsAppAccountService;
+import com.comercialhibrido.service.WhatsAppTemplateService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -43,6 +44,7 @@ public class CompanySettingsController {
     private final UserRepository userRepository;
     private final MessageRepository messageRepository;
     private final WhatsAppAccountService whatsAppAccountService;
+    private final WhatsAppTemplateService templateService;
     private final PlatformProperties platformProperties;
 
     @GetMapping
@@ -105,7 +107,15 @@ public class CompanySettingsController {
         if (!verification.ok()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, verification.error());
         }
+        String waba = blankToNull(request.businessAccountId());
+        if (waba != null) {
+            String wabaError = templateService.verificarCuenta(waba, tokenToUse);
+            if (wabaError != null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, wabaError);
+            }
+        }
         company.setWhatsappPhoneNumberId(phoneNumberId);
+        company.setWhatsappBusinessAccountId(waba);
         if (token != null) {
             company.setWhatsappAccessToken(token);
         }
@@ -116,11 +126,21 @@ public class CompanySettingsController {
     @PostMapping("/whatsapp/test")
     public WhatsAppResponse probarWhatsapp(@RequestAttribute(AUTH) JwtService.JwtPayload user) {
         Company company = empresa(user);
+        if (company.getWhatsappPhoneNumberId() == null) {
+            return new WhatsAppResponse(null, false, new WhatsAppAccountService.Verification(
+                false, null, null, null, "Aún no hay un número conectado. Ingresa el Phone Number ID y guárdalo."));
+        }
         return new WhatsAppResponse(
             company.getWhatsappPhoneNumberId(),
             company.getWhatsappAccessToken() != null,
             whatsAppAccountService.verificar(company.getWhatsappPhoneNumberId(), company.getWhatsappAccessToken())
         );
+    }
+
+    /** Plantillas aprobadas en Meta para la cuenta de la empresa. */
+    @GetMapping("/whatsapp/templates")
+    public List<WhatsAppTemplateService.Template> plantillas(@RequestAttribute(AUTH) JwtService.JwtPayload user) {
+        return templateService.aprobadas(empresa(user));
     }
 
     @GetMapping("/onboarding")
@@ -133,7 +153,9 @@ public class CompanySettingsController {
 
         List<Step> steps = List.of(
             new Step("whatsapp", "Conectar el número de WhatsApp", company.getWhatsappPhoneNumberId() != null,
-                "Phone Number ID " + company.getWhatsappPhoneNumberId()),
+                company.getWhatsappPhoneNumberId() != null
+                    ? "Phone Number ID " + company.getWhatsappPhoneNumberId()
+                    : "Aún no hay un número conectado."),
             new Step("mensajes", "Recibir el primer mensaje de un cliente", lastClientMessage != null,
                 lastClientMessage != null ? "Ya llegan mensajes de clientes." : "Escribe al número desde otro teléfono para probar."),
             new Step("conocimiento", "Cargar la base de conocimiento", knowledge >= MIN_KNOWLEDGE_CHARS,
@@ -188,7 +210,9 @@ public class CompanySettingsController {
     public record WhatsAppRequest(
         @NotBlank(message = "El Phone Number ID es obligatorio")
         @Pattern(regexp = "^\\s*\\d{6,30}\\s*$", message = "El Phone Number ID solo tiene números") String phoneNumberId,
-        @Size(max = 500) String accessToken
+        @Size(max = 500) String accessToken,
+        @Pattern(regexp = "^\\s*$|^\\s*\\d{6,30}\\s*$", message = "El ID de la cuenta de WhatsApp Business solo tiene números")
+        String businessAccountId
     ) {}
 
     public record WhatsAppResponse(String phoneNumberId, boolean hasOwnToken, WhatsAppAccountService.Verification verification) {}
@@ -202,6 +226,7 @@ public class CompanySettingsController {
     public record CompanySettingsResponse(
         String name,
         String whatsappPhoneNumberId,
+        String whatsappBusinessAccountId,
         boolean hasOwnWhatsappToken,
         String knowledgeBase,
         String customPrompt,
@@ -213,6 +238,7 @@ public class CompanySettingsController {
             return new CompanySettingsResponse(
                 c.getName(),
                 c.getWhatsappPhoneNumberId(),
+                c.getWhatsappBusinessAccountId(),
                 c.getWhatsappAccessToken() != null && !c.getWhatsappAccessToken().isBlank(),
                 c.getKnowledgeBase(),
                 c.getCustomPrompt(),

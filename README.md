@@ -21,7 +21,11 @@ El frontend vive en [frontend/](frontend/) (React + TypeScript + Vite + Tailwind
 - **Resultados**: dashboard con conversaciones activas, % resuelto por el bot, leads calientes, escalaciones y tiempo de respuesta del asesor, comparados con el período anterior (7, 30 o 90 días), gráfico de mensajes por día, estado actual y leads más calientes.
 - **Bot**: editor de directrices y base de conocimiento, catálogo de productos (alta, edición, disponibilidad) y un probador que responde como el bot real sin enviar nada por WhatsApp. Editar requiere rol `ADMIN`; un `COMERCIAL` lo ve en modo lectura.
 - **Ajustes**: lista de puesta en marcha, equipo (invitar con contraseña temporal, roles, desactivar, restablecer contraseña), conexión del número de WhatsApp verificada contra Meta, y marca blanca (color y logo de la empresa aplicados a todo el panel).
-- **Solicitudes**: solo para los dueños de la plataforma (`PLATFORM_ADMIN_EMAILS`); lista las solicitudes de demo de la landing para contactarlas y marcar su estado.
+- **Plataforma**: solo para los dueños de la plataforma (`PLATFORM_ADMIN_EMAILS`). *Solicitudes* lista las demos pedidas en la landing y permite convertirlas en cliente (crea la empresa y su primer administrador con contraseña temporal). *Clientes* lista las empresas y permite darlas de alta o suspenderlas: una empresa suspendida no puede entrar al panel y el bot deja de atenderla.
+
+### Ventana de 24 horas de WhatsApp
+
+Meta solo permite escribir texto libre hasta 24 horas después del último mensaje del cliente. Pasado ese plazo, el chat muestra la ventana como cerrada y ofrece las **plantillas aprobadas** de la cuenta de WhatsApp Business de la empresa (se leen de Meta en vivo; requieren el ID de la cuenta en Ajustes → WhatsApp). El asesor completa los datos de la plantilla, ve el mensaje final y lo envía; cuando el cliente responde, se reabre la ventana.
 
 La bandeja incluye contadores por estado, búsqueda (Ctrl K), orden por score, mensajes sin leer, chat con estados de entrega, adjuntos, respuestas rápidas con `/`, ficha del cliente con lead score y resumen del bot, alertas en vivo (aviso, sonido, notificación del navegador y contador en la pestaña) y diseño adaptado a celular.
 
@@ -143,6 +147,10 @@ La base de datos es la fuente durable de trabajos; por eso el proceso puede rein
 | `POST` | `/api/company/whatsapp/test` | Prueba la conexión del número guardado. |
 | `GET` | `/api/company/onboarding` | Pasos de puesta en marcha y su estado. |
 | `GET`, `PUT` | `/api/platform/leads[/{id}]` | Solicitudes de la landing (dueños de la plataforma). |
+| `GET`, `POST` | `/api/platform/companies` | Lista empresas clientes / crea una con su administrador (dueños de la plataforma). |
+| `PUT` | `/api/platform/companies/{id}` | Suspende o reactiva una empresa (dueños de la plataforma). |
+| `GET` | `/api/company/whatsapp/templates` | Plantillas aprobadas en Meta para la empresa. |
+| `POST` | `/api/conversations/{id}/plantilla` | Envía una plantilla aprobada (necesaria con la ventana de 24 h cerrada). |
 | `GET` | `/api/public/config` | Configuración pública de la landing. |
 | `POST` | `/api/public/leads` | Solicitud de demo desde la landing (sin autenticación, limitada por IP). |
 | `GET` | `/health` | Health check del proceso HTTP. |
@@ -159,7 +167,7 @@ El esquema lo gestiona Flyway (`src/main/resources/db/migration`) y Hibernate so
 ./mvnw test
 ```
 
-Cubren hashing de contraseñas, JWT, firma HMAC del webhook y autenticación del WebSocket; contra el API real sobre H2: login, aislamiento entre empresas, idempotencia del webhook, estados de entrega, reclamo atómico de jobs, permisos de ADMIN, catálogo, probador y cálculo de métricas; y las migraciones Flyway aplicadas desde cero sobre un PostgreSQL real embebido.
+Las llamadas a Meta (verificación de número, plantillas y envío) se prueban contra un servidor que la simula, con el worker entregando los mensajes de verdad. Cubren además hashing de contraseñas, JWT, firma HMAC del webhook y autenticación del WebSocket; contra el API real sobre H2: login, aislamiento entre empresas, idempotencia del webhook, estados de entrega, reclamo atómico de jobs, permisos de ADMIN, catálogo, probador y cálculo de métricas; y las migraciones Flyway aplicadas desde cero sobre un PostgreSQL real embebido.
 
 ## Pendientes antes de producción
 

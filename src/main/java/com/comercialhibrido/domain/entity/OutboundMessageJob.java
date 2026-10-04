@@ -45,6 +45,17 @@ public class OutboundMessageJob {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String body;
 
+    /** Si no es nulo, el mensaje se envía como plantilla aprobada (fuera de la ventana de 24 h). */
+    @Column(length = 512)
+    private String templateName;
+
+    @Column(length = 15)
+    private String templateLanguage;
+
+    /** Parámetros del cuerpo de la plantilla, como arreglo JSON de textos. */
+    @Column(columnDefinition = "TEXT")
+    private String templateParams;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default

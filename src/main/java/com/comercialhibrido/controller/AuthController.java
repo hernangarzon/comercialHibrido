@@ -37,6 +37,11 @@ public class AuthController {
                 .body(Map.of("error", "Correo o contraseña incorrectos."));
         }
 
+        if (!user.getCompany().isActive()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("error", "La cuenta de tu empresa está suspendida. Contacta a soporte."));
+        }
+
         if (passwordService.needsUpgrade(user.getPasswordHash())) {
             user.setPasswordHash(passwordService.hashPassword(pass));
             userRepository.save(user);

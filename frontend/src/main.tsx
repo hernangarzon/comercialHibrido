@@ -8,7 +8,7 @@ import { LoginPage } from './features/auth/LoginPage'
 import { BotSettingsPage } from './features/bot/BotSettingsPage'
 import { DashboardPage } from './features/dashboard/DashboardPage'
 import { InboxPage } from './features/inbox/InboxPage'
-import { LeadsPage } from './features/platform/LeadsPage'
+import { PlatformPage } from './features/platform/PlatformPage'
 import { SettingsPage } from './features/settings/SettingsPage'
 import './index.css'
 import { ApiError, api } from './lib/api'
@@ -57,7 +57,7 @@ function AuthenticatedApp() {
   useEffect(() => setTitleBadge(pending), [pending])
   useBrandColor(company?.brandColor)
 
-  const page = route.page === 'solicitudes' && !session.platformAdmin ? 'bandeja' : route.page
+  const page = route.page === 'plataforma' && !session.platformAdmin ? 'bandeja' : route.page
 
   return (
     <AppShell page={page} badges={{ pending, newLeads }} logoDataUrl={company?.logoDataUrl ?? null}>
@@ -65,7 +65,7 @@ function AuthenticatedApp() {
       {page === 'resultados' && <DashboardPage />}
       {page === 'bot' && <BotSettingsPage />}
       {page === 'ajustes' && <SettingsPage tab={route.params.get('tab')} />}
-      {page === 'solicitudes' && <LeadsPage />}
+      {page === 'plataforma' && <PlatformPage tab={route.params.get('tab')} />}
     </AppShell>
   )
 }
@@ -75,7 +75,7 @@ createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <App />
-        <Toaster position="bottom-right" richColors closeButton />
+        <Toaster position="top-center" richColors closeButton />
       </AuthProvider>
     </QueryClientProvider>
   </StrictMode>,

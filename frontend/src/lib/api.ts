@@ -13,6 +13,8 @@ export interface Conversation {
   lastMessage: string | null
   lastMessageSender: Sender | null
   lastMessageAt: string | null
+  /** Cierre de la ventana de 24 h para escribir texto libre (null si el cliente nunca escribió). */
+  windowClosesAt: string | null
   summary: string | null
   assignedSalespersonId: string | null
   createdAt: string
@@ -23,7 +25,7 @@ export interface ChatMessage {
   id: string
   sender: Sender
   content: string
-  mediaType: 'TEXT' | 'IMAGE' | 'DOCUMENT'
+  mediaType: 'TEXT' | 'IMAGE' | 'DOCUMENT' | 'TEMPLATE'
   mediaId: string | null
   mediaFilename: string | null
   deliveryStatus: DeliveryStatus | null
@@ -82,7 +84,8 @@ export interface Dashboard {
 
 export interface CompanySettings {
   name: string
-  whatsappPhoneNumberId: string
+  whatsappPhoneNumberId: string | null
+  whatsappBusinessAccountId: string | null
   hasOwnWhatsappToken: boolean
   knowledgeBase: string | null
   customPrompt: string | null
@@ -134,7 +137,31 @@ export interface Onboarding {
   platformWebhook: { callbackUrl: string } | null
 }
 
-export type LeadStatus = 'NUEVA' | 'CONTACTADA' | 'DESCARTADA'
+export type LeadStatus = 'NUEVA' | 'CONTACTADA' | 'DESCARTADA' | 'CONVERTIDA'
+
+export interface WhatsAppTemplate {
+  name: string
+  language: string
+  category: string
+  body: string
+  paramCount: number
+}
+
+export interface ClientCompany {
+  id: string
+  name: string
+  active: boolean
+  whatsappConnected: boolean
+  users: number
+  conversations: number
+  yours: boolean
+  createdAt: string
+}
+
+export interface NewClient {
+  company: ClientCompany
+  invitation: Invitation
+}
 
 export interface SalesLead {
   id: string
@@ -313,8 +340,30 @@ export const api = {
       body: JSON.stringify({ brandColor: brandColor ?? '', logoDataUrl: logoDataUrl ?? '' }),
     }),
 
-  connectWhatsapp: (phoneNumberId: string, accessToken: string) =>
-    request<WhatsAppStatus>('/api/company/whatsapp', { method: 'PUT', body: JSON.stringify({ phoneNumberId, accessToken }) }),
+  connectWhatsapp: (phoneNumberId: string, accessToken: string, businessAccountId: string) =>
+    request<WhatsAppStatus>('/api/company/whatsapp', {
+      method: 'PUT',
+      body: JSON.stringify({ phoneNumberId, accessToken, businessAccountId }),
+    }),
+
+  templates: () => request<WhatsAppTemplate[]>('/api/company/whatsapp/templates'),
+
+  sendTemplate: (conversationId: string, name: string, language: string, params: string[]) =>
+    request<void>(`/api/conversations/${conversationId}/plantilla`, {
+      method: 'POST',
+      body: JSON.stringify({ name, language, params }),
+    }),
+
+  clients: () => request<ClientCompany[]>('/api/platform/companies'),
+
+  createClient: (companyName: string, adminName: string, adminEmail: string, leadId?: string) =>
+    request<NewClient>('/api/platform/companies', {
+      method: 'POST',
+      body: JSON.stringify({ companyName, adminName, adminEmail, leadId }),
+    }),
+
+  setClientActive: (id: string, active: boolean) =>
+    request<ClientCompany>(`/api/platform/companies/${id}`, { method: 'PUT', body: JSON.stringify({ active }) }),
 
   testWhatsapp: () => request<WhatsAppStatus>('/api/company/whatsapp/test', { method: 'POST' }),
 

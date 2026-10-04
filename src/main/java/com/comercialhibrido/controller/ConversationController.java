@@ -5,12 +5,16 @@ import com.comercialhibrido.domain.entity.Message;
 import com.comercialhibrido.domain.enums.ConversationStatus;
 import com.comercialhibrido.dto.SendMessageRequest;
 import com.comercialhibrido.exception.IllegalTransitionException;
+import com.comercialhibrido.repository.ConversationInstant;
 import com.comercialhibrido.repository.ConversationRepository;
 import com.comercialhibrido.repository.MessageRepository;
 import com.comercialhibrido.security.JwtService;
 import com.comercialhibrido.service.ConversationStateService;
+import com.comercialhibrido.service.CustomerServiceWindow;
 import com.comercialhibrido.service.OutgoingMessageService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,7 +23,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/conversations")
@@ -48,10 +54,14 @@ public class ConversationController {
             ? conversationRepository.findByCompanyIdAndStatusOrderByUpdatedAtDesc(companyId, status)
             : conversationRepository.findByCompanyIdOrderByUpdatedAtDesc(companyId);
 
+        // Último mensaje del cliente de cada conversación en una sola consulta (ventana de 24 h).
+        Map<UUID, Instant> lastClient = messageRepository.lastClientMessageByConversation(companyId).stream()
+            .collect(Collectors.toMap(ConversationInstant::conversationId, ConversationInstant::at));
+
         List<ConversationSummaryResponse> response = conversaciones.stream()
             .map(c -> {
                 Message ultimoMsg = messageRepository.findFirstByConversationIdOrderByCreatedAtDesc(c.getId()).orElse(null);
-                return ConversationSummaryResponse.from(c, ultimoMsg);
+                return ConversationSummaryResponse.from(c, ultimoMsg, CustomerServiceWindow.closesAt(lastClient.get(c.getId())));
             })
             .toList();
 
@@ -80,7 +90,7 @@ public class ConversationController {
         verificarPertenencia(conversationId, user);
         // El comercial asignado es quien hace la petición, no un id enviado por el cliente.
         Conversation conversation = conversationStateService.tomarControl(conversationId, user.userId());
-        return ResponseEntity.ok(ConversationSummaryResponse.from(conversation, null));
+        return ResponseEntity.ok(ConversationSummaryResponse.from(conversation, null, null));
     }
 
     @PostMapping("/{id}/liberar-control")
@@ -90,7 +100,7 @@ public class ConversationController {
     ) {
         verificarPertenencia(conversationId, user);
         Conversation conversation = conversationStateService.liberarControl(conversationId);
-        return ResponseEntity.ok(ConversationSummaryResponse.from(conversation, null));
+        return ResponseEntity.ok(ConversationSummaryResponse.from(conversation, null, null));
     }
 
     @PostMapping("/{id}/archivar")
@@ -100,7 +110,7 @@ public class ConversationController {
     ) {
         verificarPertenencia(conversationId, user);
         Conversation conversation = conversationStateService.archivar(conversationId);
-        return ResponseEntity.ok(ConversationSummaryResponse.from(conversation, null));
+        return ResponseEntity.ok(ConversationSummaryResponse.from(conversation, null, null));
     }
 
     @PostMapping("/{id}/mensajes")
@@ -113,6 +123,24 @@ public class ConversationController {
         outgoingMessageService.enviarMensajeComercial(conversationId, request.content());
         return ResponseEntity.accepted().build();
     }
+
+    /** Envía una plantilla aprobada en Meta (la única opción con la ventana de 24 h cerrada). */
+    @PostMapping("/{id}/plantilla")
+    public ResponseEntity<Void> enviarPlantilla(
+        @PathVariable("id") UUID conversationId,
+        @Valid @RequestBody TemplateMessageRequest request,
+        @RequestAttribute(AUTH_ATTRIBUTE) JwtService.JwtPayload user
+    ) {
+        verificarPertenencia(conversationId, user);
+        outgoingMessageService.enviarPlantilla(conversationId, request.name(), request.language(), request.params());
+        return ResponseEntity.accepted().build();
+    }
+
+    public record TemplateMessageRequest(
+        @NotBlank @Size(max = 512) String name,
+        @NotBlank @Size(max = 15) String language,
+        @Size(max = 20) List<@Size(max = 1024) String> params
+    ) {}
 
     /**
      * Responde 404 (no 403) si la conversación es de otra empresa, para no revelar que existe.
@@ -137,12 +165,14 @@ public class ConversationController {
         String lastMessage,
         String lastMessageSender,
         Instant lastMessageAt,
+        /** Cierre de la ventana de 24 h para responder con texto libre (null si el cliente nunca escribió). */
+        Instant windowClosesAt,
         String summary,
         UUID assignedSalespersonId,
         Instant createdAt,
         Instant updatedAt
     ) {
-        static ConversationSummaryResponse from(Conversation c, Message lastMessage) {
+        static ConversationSummaryResponse from(Conversation c, Message lastMessage, Instant windowClosesAt) {
             String name = (c.getCustomer() != null && c.getCustomer().getDisplayName() != null) 
                 ? c.getCustomer().getDisplayName() 
                 : "Sin Nombre";
@@ -157,6 +187,7 @@ public class ConversationController {
                 lastMessage != null ? lastMessage.getContent() : null,
                 lastMessage != null ? lastMessage.getSender().name() : null,
                 lastMessage != null ? lastMessage.getCreatedAt() : null,
+                windowClosesAt,
                 c.getSummary(),
                 c.getAssignedSalespersonId(),
                 c.getCreatedAt(),

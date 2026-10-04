@@ -13,6 +13,7 @@ import com.comercialhibrido.repository.ConversationRepository;
 import com.comercialhibrido.repository.InboundMessageJobRepository;
 import com.comercialhibrido.repository.MessageRepository;
 import com.comercialhibrido.repository.OutboundMessageJobRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,6 +44,7 @@ public class MessageJobWorker {
     private final AgentProperties agentProperties;
     private final TransactionTemplate transactionTemplate;
     private final ApplicationEventPublisher eventPublisher;
+    private final ObjectMapper objectMapper;
 
     @Scheduled(fixedDelayString = "${agent.worker-fixed-delay-ms:1000}")
     public void runCycle() {
@@ -81,8 +83,11 @@ public class MessageJobWorker {
                 continue;
             }
             try {
-                String externalId = whatsAppMessageSender.enviarTexto(
-                    claim.phoneNumberId(), claim.accessToken(), claim.toPhoneNumber(), claim.body());
+                String externalId = claim.templateName() != null
+                    ? whatsAppMessageSender.enviarPlantilla(claim.phoneNumberId(), claim.accessToken(),
+                        claim.toPhoneNumber(), claim.templateName(), claim.templateLanguage(), claim.templateParams())
+                    : whatsAppMessageSender.enviarTexto(
+                        claim.phoneNumberId(), claim.accessToken(), claim.toPhoneNumber(), claim.body());
                 completeOutbound(claim.id(), externalId);
             } catch (Exception e) {
                 retryOutbound(claim.id(), e);
@@ -119,7 +124,10 @@ public class MessageJobWorker {
                         job.getToPhoneNumber(),
                         job.getBody(),
                         company != null ? company.getWhatsappPhoneNumberId() : null,
-                        company != null ? company.getWhatsappAccessToken() : null
+                        company != null ? company.getWhatsappAccessToken() : null,
+                        job.getTemplateName(),
+                        job.getTemplateLanguage(),
+                        parseParams(job.getTemplateParams())
                     );
                 })
                 .orElse(null);
@@ -210,6 +218,16 @@ public class MessageJobWorker {
     }
 
     private record InboundClaim(UUID id, UUID conversationId) {}
+    private List<String> parseParams(String json) {
+        if (json == null || json.isBlank()) return List.of();
+        try {
+            return List.of(objectMapper.readValue(json, String[].class));
+        } catch (Exception e) {
+            throw new IllegalStateException("Parámetros de plantilla inválidos: " + e.getMessage(), e);
+        }
+    }
+
     private record OutboundClaim(
-        UUID id, String toPhoneNumber, String body, String phoneNumberId, String accessToken) {}
+        UUID id, String toPhoneNumber, String body, String phoneNumberId, String accessToken,
+        String templateName, String templateLanguage, List<String> templateParams) {}
 }

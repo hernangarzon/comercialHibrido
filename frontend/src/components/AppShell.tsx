@@ -16,7 +16,7 @@ const NAV: { page: Page; label: string; icon: typeof Inbox; platformOnly?: boole
   { page: 'resultados', label: 'Resultados', icon: BarChart3 },
   { page: 'bot', label: 'Bot', icon: Bot },
   { page: 'ajustes', label: 'Ajustes', icon: Settings },
-  { page: 'solicitudes', label: 'Solicitudes', icon: Megaphone, platformOnly: true },
+  { page: 'plataforma', label: 'Plataforma', icon: Megaphone, platformOnly: true },
 ]
 
 export interface ShellBadges {
@@ -90,7 +90,7 @@ function Header({ page, connected, badges, logoDataUrl }: { page: Page; connecte
 
       <nav className="flex items-center gap-0.5 sm:ml-2">
         {NAV.filter((item) => !item.platformOnly || session.platformAdmin).map(({ page: target, label, icon: Icon }) => {
-          const badge = target === 'bandeja' ? badges.pending : target === 'solicitudes' ? badges.newLeads : 0
+          const badge = target === 'bandeja' ? badges.pending : target === 'plataforma' ? badges.newLeads : 0
           return (
           <a
             key={target}

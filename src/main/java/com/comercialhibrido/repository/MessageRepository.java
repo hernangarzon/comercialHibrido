@@ -38,6 +38,24 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
      */
     boolean existsByMediaIdAndConversation_Company_Id(String mediaId, UUID companyId);
 
+    /** Último mensaje del cliente en una conversación: abre la ventana de 24 h de WhatsApp. */
+    @Query("""
+        SELECT MAX(m.createdAt) FROM Message m
+         WHERE m.conversation.id = :conversationId
+           AND m.sender = com.comercialhibrido.domain.enums.MessageSender.CLIENTE
+        """)
+    Instant lastClientMessageAtInConversation(@Param("conversationId") UUID conversationId);
+
+    /** Último mensaje del cliente en cada conversación de la empresa (una sola consulta para la bandeja). */
+    @Query("""
+        SELECT new com.comercialhibrido.repository.ConversationInstant(m.conversation.id, MAX(m.createdAt))
+          FROM Message m
+         WHERE m.conversation.company.id = :companyId
+           AND m.sender = com.comercialhibrido.domain.enums.MessageSender.CLIENTE
+         GROUP BY m.conversation.id
+        """)
+    List<ConversationInstant> lastClientMessageByConversation(@Param("companyId") UUID companyId);
+
     /** Último mensaje de un cliente a la empresa (null si nunca llegó ninguno). */
     @Query("""
         SELECT MAX(m.createdAt) FROM Message m

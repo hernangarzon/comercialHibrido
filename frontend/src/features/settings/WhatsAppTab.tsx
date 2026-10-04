@@ -15,6 +15,10 @@ const STEPS = [
     text: 'Debajo del número que vas a usar aparece «Identificador del número de teléfono» (Phone Number ID): solo números.',
   },
   {
+    title: 'Copia el ID de la cuenta de WhatsApp Business',
+    text: 'En la misma página aparece «Identificador de la cuenta de WhatsApp Business». Lo usamos para leer tus plantillas aprobadas.',
+  },
+  {
     title: 'Genera un token permanente',
     text: 'En Business Settings → Usuarios del sistema crea uno con permiso whatsapp_business_messaging y genera su token. Los tokens temporales vencen en 24 horas.',
   },
@@ -24,6 +28,7 @@ export function WhatsAppTab({ editable }: { editable: boolean }) {
   const queryClient = useQueryClient()
   const { data: settings, isLoading } = useQuery({ queryKey: ['company'], queryFn: api.companySettings })
   const [phoneNumberId, setPhoneNumberId] = useState<string | null>(null)
+  const [businessAccountId, setBusinessAccountId] = useState<string | null>(null)
   const [token, setToken] = useState('')
   const [status, setStatus] = useState<WhatsAppStatus | null>(null)
 
@@ -34,7 +39,12 @@ export function WhatsAppTab({ editable }: { editable: boolean }) {
   })
 
   const connect = useMutation({
-    mutationFn: () => api.connectWhatsapp((phoneNumberId ?? settings?.whatsappPhoneNumberId ?? '').trim(), token.trim()),
+    mutationFn: () =>
+      api.connectWhatsapp(
+        (phoneNumberId ?? settings?.whatsappPhoneNumberId ?? '').trim(),
+        token.trim(),
+        (businessAccountId ?? settings?.whatsappBusinessAccountId ?? '').trim(),
+      ),
     onSuccess: (result) => {
       setStatus(result)
       setToken('')
@@ -81,6 +91,23 @@ export function WhatsAppTab({ editable }: { editable: boolean }) {
               placeholder="Ej.: 1333592066495703"
               className="mt-1.5 h-10 w-full rounded-lg border border-slate-300 px-3 font-mono text-sm outline-none read-only:bg-slate-50 focus:border-brand-500 focus:ring-4 focus:ring-brand-100"
             />
+          </label>
+
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700">
+              ID de la cuenta de WhatsApp Business <span className="font-normal text-slate-400">(para plantillas)</span>
+            </span>
+            <input
+              readOnly={!editable}
+              inputMode="numeric"
+              value={businessAccountId ?? settings.whatsappBusinessAccountId ?? ''}
+              onChange={(e) => setBusinessAccountId(e.target.value)}
+              placeholder="Ej.: 102290129340398"
+              className="mt-1.5 h-10 w-full rounded-lg border border-slate-300 px-3 font-mono text-sm outline-none read-only:bg-slate-50 focus:border-brand-500 focus:ring-4 focus:ring-brand-100"
+            />
+            <span className="mt-1 block text-xs text-slate-500">
+              Sin él no se pueden enviar plantillas, que son la única forma de escribirle a un cliente después de 24 horas sin respuesta.
+            </span>
           </label>
 
           {editable && (

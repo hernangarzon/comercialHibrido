@@ -1,13 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Archive, ArrowLeft, Bot, Hand, MessagesSquare, PanelRight } from 'lucide-react'
+import clsx from 'clsx'
+import { Archive, ArrowLeft, Bot, Clock, Hand, MessagesSquare, PanelRight } from 'lucide-react'
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Avatar, Button, EmptyState, IconButton, ScoreBadge, Skeleton, StatusBadge } from '../../components/ui'
 import { api, type ChatMessage, type Conversation } from '../../lib/api'
 import { useSession } from '../../lib/auth'
-import { dayLabel, displayName } from '../../lib/format'
+import { dayLabel, displayName, timeAgo, windowState } from '../../lib/format'
 import { Composer } from './Composer'
 import { MessageBubble } from './MessageBubble'
+import { TemplateComposer } from './TemplateComposer'
 
 interface Props {
   conversation: Conversation
@@ -83,6 +85,12 @@ export function ChatView({ conversation, onBack, onToggleDetails, onSeen, onStat
 
   const canReply = conversation.status === 'HUMANO_CONTROL'
   const busy = action.isPending
+  // Si el último mensaje cargado es del cliente, la ventana se calcula con él (más fresco que la lista).
+  const lastClientAt = [...(messages ?? [])].reverse().find((m) => m.sender === 'CLIENTE')?.createdAt
+  const closesAt = lastClientAt
+    ? new Date(new Date(lastClientAt).getTime() + 24 * 3600_000).toISOString()
+    : conversation.windowClosesAt
+  const window24 = windowState(closesAt)
 
   return (
     <div className="flex h-full min-w-0 flex-col">
@@ -99,6 +107,14 @@ export function ChatView({ conversation, onBack, onToggleDetails, onSeen, onStat
           <div className="flex items-center gap-2 text-xs text-slate-500">
             <span className="truncate">{conversation.customerPhone}</span>
             <StatusBadge status={conversation.status} />
+            {canReply && (
+              <span
+                title="WhatsApp permite escribir texto libre hasta 24 h después del último mensaje del cliente"
+                className={clsx('hidden items-center gap-1 sm:inline-flex', window24.open ? 'text-slate-500' : 'font-medium text-amber-700')}
+              >
+                <Clock className="size-3" /> {window24.label}
+              </span>
+            )}
           </div>
         </div>
 
@@ -133,7 +149,13 @@ export function ChatView({ conversation, onBack, onToggleDetails, onSeen, onStat
 
       <MessageList messages={messages} loading={isLoading} />
 
-      {canReply ? (
+      {canReply && !window24.open ? (
+        <TemplateComposer
+          conversationId={conversation.id}
+          closedSince={closesAt ? timeAgo(closesAt) : null}
+          onSent={refresh}
+        />
+      ) : canReply ? (
         <Composer
           onSend={(text) => send.mutate(text)}
           agentName={session.name}

@@ -99,6 +99,16 @@ public class DevDataSeeder implements ApplicationRunner {
         crearConversacion(laboratorio, "+573001110004", "Dr. Pedro Ruiz", ConversationStatus.ARCHIVADO, 20,
             msg(MessageSender.CLIENTE, "Gracias, ya recibí el pedido."),
             msg(MessageSender.BOT, "¡Gracias a usted, Dr. Pedro! Quedamos atentos."));
+        // Ventana de 24 h cerrada: el cliente escribió hace 2 días; solo se le puede escribir con plantilla.
+        Conversation marcela = crearConversacion(laboratorio, "+573001110006", "Dra. Marcela Ríos", ConversationStatus.HUMANO_CONTROL, 60);
+        Instant haceDosDias = Instant.now().minus(Duration.ofDays(2));
+        for (Message m : List.of(
+            msgEn(MessageSender.CLIENTE, "¿Me envían la cotización de 4 carillas?", haceDosDias),
+            msgEn(MessageSender.COMERCIAL, "Claro, la preparo y te la envío.", haceDosDias.plus(Duration.ofMinutes(10))))) {
+            m.setConversation(marcela);
+            messageRepository.save(m);
+        }
+
         // XSS de prueba: el panel debe mostrarlo como texto, sin ejecutarlo.
         crearConversacion(laboratorio, "+573001110005", "<b>Cliente HTML</b>", ConversationStatus.BOT_ACTIVO, 10,
             msg(MessageSender.CLIENTE, "<img src=x onerror=\"alert('xss')\"> hola"));

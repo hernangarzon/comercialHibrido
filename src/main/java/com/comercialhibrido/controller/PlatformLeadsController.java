@@ -55,7 +55,8 @@ public class PlatformLeadsController {
     }
 
     public record StatusRequest(
-        @Pattern(regexp = SalesLead.NUEVA + "|" + SalesLead.CONTACTADA + "|" + SalesLead.DESCARTADA, message = "Estado no válido")
+        @Pattern(regexp = SalesLead.NUEVA + "|" + SalesLead.CONTACTADA + "|" + SalesLead.DESCARTADA + "|" + SalesLead.CONVERTIDA,
+            message = "Estado no válido")
         String status
     ) {}
 

@@ -84,3 +84,16 @@ export function scoreLevel(score: number): { label: string; className: string } 
   if (score >= 40) return { label: 'Tibio', className: 'bg-amber-50 text-amber-700 ring-amber-200' }
   return { label: 'Frío', className: 'bg-slate-100 text-slate-600 ring-slate-200' }
 }
+
+/**
+ * Estado de la ventana de 24 h de WhatsApp. Abierta = se puede escribir texto libre;
+ * cerrada = solo plantillas aprobadas.
+ */
+export function windowState(closesAt: string | null, now = Date.now()): { open: boolean; label: string } {
+  if (!closesAt) return { open: false, label: 'Sin mensajes del cliente' }
+  const ms = new Date(closesAt).getTime() - now
+  if (ms <= 0) return { open: false, label: 'Ventana de 24 h cerrada' }
+  const minutes = Math.floor(ms / 60000)
+  const remaining = minutes < 60 ? `${Math.max(1, minutes)} min` : `${Math.floor(minutes / 60)} h`
+  return { open: true, label: `Ventana abierta · quedan ${remaining}` }
+}

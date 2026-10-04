@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -37,12 +38,46 @@ public class WhatsAppMessageSender {
      * Envío multiempresa: utiliza el Phone Number ID y Token de la empresa específica.
      */
     public String enviarTexto(String phoneNumberId, String accessToken, String toPhoneNumber, String body) {
-        String targetPhoneId = (phoneNumberId != null && !phoneNumberId.isBlank()) 
-            ? phoneNumberId 
+        Map<String, Object> payload = Map.of(
+            "messaging_product", "whatsapp",
+            "to", toPhoneNumber,
+            "type", "text",
+            "text", Map.of("body", body)
+        );
+        return enviar(phoneNumberId, accessToken, toPhoneNumber, payload);
+    }
+
+    /**
+     * Envía una plantilla aprobada. Es la única forma de escribirle a un cliente
+     * cuando pasaron más de 24 h desde su último mensaje (política de Meta).
+     */
+    public String enviarPlantilla(String phoneNumberId, String accessToken, String toPhoneNumber,
+                                  String templateName, String language, List<String> bodyParams) {
+        Map<String, Object> template = new LinkedHashMap<>();
+        template.put("name", templateName);
+        template.put("language", Map.of("code", language));
+        if (bodyParams != null && !bodyParams.isEmpty()) {
+            template.put("components", List.of(Map.of(
+                "type", "body",
+                "parameters", bodyParams.stream().map(p -> Map.of("type", "text", "text", p)).toList()
+            )));
+        }
+        Map<String, Object> payload = Map.of(
+            "messaging_product", "whatsapp",
+            "to", toPhoneNumber,
+            "type", "template",
+            "template", template
+        );
+        return enviar(phoneNumberId, accessToken, toPhoneNumber, payload);
+    }
+
+    private String enviar(String phoneNumberId, String accessToken, String toPhoneNumber, Map<String, Object> payload) {
+        String targetPhoneId = (phoneNumberId != null && !phoneNumberId.isBlank())
+            ? phoneNumberId
             : whatsAppProperties.phoneNumberId();
 
-        String token = (accessToken != null && !accessToken.isBlank()) 
-            ? accessToken 
+        String token = (accessToken != null && !accessToken.isBlank())
+            ? accessToken
             : whatsAppProperties.accessToken();
 
         RestClient client = restClientBuilder.clone()
@@ -50,14 +85,7 @@ public class WhatsAppMessageSender {
             .defaultHeader("Authorization", "Bearer " + token)
             .build();
 
-        Map<String, Object> payload = Map.of(
-            "messaging_product", "whatsapp",
-            "to", toPhoneNumber,
-            "type", "text",
-            "text", Map.of("body", body)
-        );
-
-        log.info("Enviando mensaje a {} desde PhoneId {}", toPhoneNumber, targetPhoneId);
+        log.info("Enviando mensaje ({}) a {} desde PhoneId {}", payload.get("type"), toPhoneNumber, targetPhoneId);
 
         WhatsAppSendResponse response = client.post()
             .uri("/{phoneNumberId}/messages", targetPhoneId)
