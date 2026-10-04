@@ -113,6 +113,14 @@ export function Landing() {
         © {YEAR} Comercial Híbrido ·{' '}
         <a href="/app/" className="hover:text-slate-800">
           Acceso clientes
+        </a>{' '}
+        ·{' '}
+        <a href="/privacidad" className="hover:text-slate-800">
+          Privacidad
+        </a>{' '}
+        ·{' '}
+        <a href="/terminos" className="hover:text-slate-800">
+          Términos
         </a>
       </footer>
     </div>
@@ -351,6 +359,7 @@ function Faq() {
 
 function Contact({ salesWhatsapp }: { salesWhatsapp: string }) {
   const [form, setForm] = useState({ name: '', companyName: '', email: '', phone: '', message: '', website: '' })
+  const [acceptedPrivacy, setAcceptedPrivacy] = useState(false)
   const [state, setState] = useState<'idle' | 'sending' | 'sent'>('idle')
   const [error, setError] = useState<string | null>(null)
   const set = (key: keyof typeof form) => (e: { target: { value: string } }) => setForm((f) => ({ ...f, [key]: e.target.value }))
@@ -363,7 +372,7 @@ function Contact({ salesWhatsapp }: { salesWhatsapp: string }) {
       const res = await fetch('/api/public/leads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, acceptedPrivacy }),
       })
       if (!res.ok) {
         const body = await res.json().catch(() => null)
@@ -442,6 +451,23 @@ function Contact({ salesWhatsapp }: { salesWhatsapp: string }) {
                   {error}
                 </p>
               )}
+              <label className="flex items-start gap-2.5 text-xs leading-relaxed text-slate-600 sm:col-span-2">
+                <input
+                  type="checkbox"
+                  required
+                  checked={acceptedPrivacy}
+                  onChange={(e) => setAcceptedPrivacy(e.target.checked)}
+                  className="mt-0.5 size-4 shrink-0 rounded border-slate-300 accent-brand-600"
+                />
+                <span>
+                  <ShieldCheck className="mr-1 inline size-3.5 align-[-2px] text-slate-400" />
+                  Autorizo el tratamiento de mis datos para que me contacten sobre la demo, según la{' '}
+                  <a href="/privacidad" target="_blank" className="font-medium text-brand-700 underline">
+                    política de privacidad
+                  </a>
+                  .
+                </span>
+              </label>
               <button
                 type="submit"
                 disabled={state === 'sending'}
@@ -449,9 +475,6 @@ function Contact({ salesWhatsapp }: { salesWhatsapp: string }) {
               >
                 {state === 'sending' ? 'Enviando…' : 'Quiero mi demo'}
               </button>
-              <p className="flex items-center gap-1.5 text-xs text-slate-500 sm:col-span-2">
-                <ShieldCheck className="size-3.5" /> Solo usamos tus datos para contactarte sobre la demo.
-              </p>
             </form>
           )}
         </div>

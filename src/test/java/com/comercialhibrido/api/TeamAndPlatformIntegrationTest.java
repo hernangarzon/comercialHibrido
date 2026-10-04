@@ -197,20 +197,26 @@ class TeamAndPlatformIntegrationTest {
     @Test
     void landingRecibeSolicitudesConAntispamYSoloLaPlataformaLasVe() throws Exception {
         String ip = "10.1." + Math.abs(sufijo.hashCode() % 250) + ".7";
-        Map<String, String> lead = new HashMap<>(Map.of("name", "Ana", "companyName", "Clínica " + sufijo,
-            "email", "ana@clinica.com", "phone", "+57 300 123 4567", "message", "Quiero una demo"));
+        Map<String, Object> lead = new HashMap<>(Map.of("name", "Ana", "companyName", "Clínica " + sufijo,
+            "email", "ana@clinica.com", "phone", "+57 300 123 4567", "message", "Quiero una demo", "acceptedPrivacy", true));
+
+        Map<String, Object> sinAutorizacion = new HashMap<>(lead);
+        sinAutorizacion.put("acceptedPrivacy", false);
+        mvc.perform(desde(ip, post("/api/public/leads")).contentType(MediaType.APPLICATION_JSON).content(json(sinAutorizacion)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.error").value("Debes autorizar el tratamiento de tus datos para enviar la solicitud"));
 
         mvc.perform(desde(ip, post("/api/public/leads")).contentType(MediaType.APPLICATION_JSON).content(json(lead)))
             .andExpect(status().isAccepted());
 
-        Map<String, String> bot = new HashMap<>(lead);
+        Map<String, Object> bot = new HashMap<>(lead);
         bot.put("companyName", "Spam " + sufijo);
         bot.put("website", "http://spam");
         mvc.perform(desde(ip, post("/api/public/leads")).contentType(MediaType.APPLICATION_JSON).content(json(bot)))
             .andExpect(status().isAccepted());
         assertThat(salesLeadRepository.findAll()).noneMatch(l -> l.getCompanyName().equals("Spam " + sufijo));
 
-        Map<String, String> invalida = new HashMap<>(lead);
+        Map<String, Object> invalida = new HashMap<>(lead);
         invalida.put("email", "no-es-correo");
         mvc.perform(desde(ip, post("/api/public/leads")).contentType(MediaType.APPLICATION_JSON).content(json(invalida)))
             .andExpect(status().isBadRequest())

@@ -116,6 +116,11 @@ export function LoginPage() {
               Entrar
             </Button>
           </form>
+
+          <p className="mt-8 text-center text-xs text-slate-400">
+            <a href="/privacidad" className="hover:text-slate-600">Privacidad</a> ·{' '}
+            <a href="/terminos" className="hover:text-slate-600">Términos</a>
+          </p>
         </div>
       </main>
     </div>

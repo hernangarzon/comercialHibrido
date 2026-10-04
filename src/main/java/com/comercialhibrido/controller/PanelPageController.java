@@ -14,4 +14,14 @@ public class PanelPageController {
     public String panel() {
         return "forward:/app/index.html";
     }
+
+    @GetMapping({"/privacidad", "/privacidad/"})
+    public String privacidad() {
+        return "forward:/privacidad/index.html";
+    }
+
+    @GetMapping({"/terminos", "/terminos/"})
+    public String terminos() {
+        return "forward:/terminos/index.html";
+    }
 }

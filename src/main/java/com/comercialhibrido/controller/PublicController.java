@@ -5,6 +5,7 @@ import com.comercialhibrido.domain.entity.SalesLead;
 import com.comercialhibrido.repository.SalesLeadRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -92,6 +93,8 @@ public class PublicController {
         @NotBlank(message = "Escribe tu teléfono")
         @Pattern(regexp = "^[+0-9 ()-]{7,40}$", message = "El teléfono no es válido") String phone,
         @Size(max = 2000, message = "El mensaje admite hasta 2.000 caracteres") String message,
+        // Autorización previa de tratamiento de datos (Ley 1581 de 2012).
+        @AssertTrue(message = "Debes autorizar el tratamiento de tus datos para enviar la solicitud") boolean acceptedPrivacy,
         String website
     ) {}
 }

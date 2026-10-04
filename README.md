@@ -15,6 +15,7 @@ Es multiempresa: cada empresa (`companies`) tiene su número de WhatsApp, su cat
 El frontend vive en [frontend/](frontend/) (React + TypeScript + Vite + Tailwind) y genera dos páginas:
 
 - **`/` Landing de ventas**: presentación del producto, preguntas frecuentes y formulario de solicitud de demo (con protección anti-spam). Si `SALES_WHATSAPP` está definido, muestra además un botón para escribir por WhatsApp.
+- **`/privacidad`** y **`/terminos`**: política de tratamiento de datos (Ley 1581 de 2012) y términos de uso. La sección `/privacidad#eliminacion` sirve como URL de instrucciones de eliminación de datos para Meta. Los datos del responsable se editan en `frontend/src/legal/company.ts`.
 - **`/app/` Panel** de cada empresa, con estas secciones:
 
 - **Bandeja**: conversaciones en vivo para los asesores.
