@@ -2,6 +2,7 @@ package com.comercialhibrido.service;
 
 import com.comercialhibrido.domain.entity.Conversation;
 import com.comercialhibrido.domain.enums.ConversationStatus;
+import com.comercialhibrido.domain.event.ConversationActivityEvent;
 import com.comercialhibrido.domain.event.ConversationEscalatedEvent;
 import com.comercialhibrido.exception.IllegalTransitionException;
 import com.comercialhibrido.repository.ConversationRepository;
@@ -13,6 +14,7 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Service
@@ -67,6 +69,7 @@ public class ConversationStateService {
         }
 
         conversation.setStatus(ConversationStatus.ESCALADO_PENDIENTE);
+        conversation.setEscalatedAt(Instant.now());
         Conversation actualizada = guardarConManejoDeConflicto(conversation);
 
         eventPublisher.publishEvent(new ConversationEscalatedEvent(conversationId, leadScore));
@@ -83,7 +86,10 @@ public class ConversationStateService {
 
     private Conversation guardarConManejoDeConflicto(Conversation conversation) {
         try {
-            return conversationRepository.saveAndFlush(conversation);
+            Conversation guardada = conversationRepository.saveAndFlush(conversation);
+            eventPublisher.publishEvent(
+                new ConversationActivityEvent(guardada.getId(), ConversationActivityEvent.Type.STATUS_CHANGED));
+            return guardada;
         } catch (ObjectOptimisticLockingFailureException e) {
             throw new IllegalTransitionException(
                 "La conversacion " + conversation.getId() +

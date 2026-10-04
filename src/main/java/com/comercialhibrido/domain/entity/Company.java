@@ -42,6 +42,15 @@ public class Company {
     @Builder.Default
     private boolean active = true;
 
+    /** Color principal de la marca en el panel (#rrggbb). Nulo = color por defecto. */
+    @Column(length = 7)
+    private String brandColor;
+
+    /** Logo como data URL (PNG/JPEG/SVG/WebP pequeño). */
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(columnDefinition = "TEXT")
+    private String logoDataUrl;
+
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 

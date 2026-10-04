@@ -40,6 +40,11 @@ public class User {
     @Builder.Default
     private boolean active = true;
 
+    /** Contraseña temporal (invitación o restablecimiento): debe cambiarla al entrar. */
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean mustChangePassword = false;
+
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 

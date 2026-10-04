@@ -45,7 +45,7 @@ public class WhatsAppMessageSender {
             ? accessToken 
             : whatsAppProperties.accessToken();
 
-        RestClient client = restClientBuilder
+        RestClient client = restClientBuilder.clone()
             .baseUrl(whatsAppProperties.apiBaseUrl())
             .defaultHeader("Authorization", "Bearer " + token)
             .build();

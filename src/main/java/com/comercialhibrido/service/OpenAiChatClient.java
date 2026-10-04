@@ -34,7 +34,7 @@ public class OpenAiChatClient {
      * humano en vez de arriesgar una respuesta inventada.
      */
     public BotAnswer generarRespuesta(List<ChatMessage> mensajes) {
-        RestClient client = restClientBuilder
+        RestClient client = restClientBuilder.clone()
             .baseUrl(openAiProperties.apiBaseUrl())
             .defaultHeader("Authorization", "Bearer " + openAiProperties.apiKey())
             .build();

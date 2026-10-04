@@ -10,7 +10,9 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.context.ApplicationEventPublisher;
+import com.comercialhibrido.domain.event.ConversationActivityEvent;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -26,6 +28,7 @@ public class IncomingMessageService {
     private final ConversationRepository conversationRepository;
     private final MessageRepository messageRepository;
     private final InboundMessageJobRepository inboundMessageJobRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public Optional<Conversation> processIncomingTextMessage(
@@ -61,7 +64,7 @@ public class IncomingMessageService {
         }
 
         Conversation conversation = conversationRepository
-            .findFirstByCustomerIdOrderByCreatedAtDesc(customer.getId())
+            .findFirstByCustomerIdAndCompanyIdOrderByCreatedAtDesc(customer.getId(), company.getId())
             .orElseGet(() -> conversationRepository.save(
                 Conversation.builder()
                     .company(company)
@@ -119,6 +122,8 @@ public class IncomingMessageService {
                 .build()
         );
 
+        eventPublisher.publishEvent(
+            new ConversationActivityEvent(conversation.getId(), ConversationActivityEvent.Type.NEW_MESSAGE));
         return Optional.of(conversation);
     }
 }

@@ -1,5 +1,6 @@
 package com.comercialhibrido.controller;
 
+import com.comercialhibrido.config.PlatformProperties;
 import com.comercialhibrido.domain.entity.User;
 import com.comercialhibrido.repository.UserRepository;
 import com.comercialhibrido.security.JwtService;
@@ -20,6 +21,7 @@ public class AuthController {
     private final UserRepository userRepository;
     private final JwtService jwtService;
     private final PasswordService passwordService;
+    private final PlatformProperties platformProperties;
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request) {
@@ -29,17 +31,15 @@ public class AuthController {
         User user = userRepository.findByEmailAndActiveTrue(email)
             .orElse(null);
 
-        if (user == null) {
+        // Mismo mensaje para usuario inexistente y contraseña errónea: no revelar qué emails existen.
+        if (user == null || !passwordService.checkPassword(pass, user.getPasswordHash())) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(Map.of("error", "Usuario no encontrado en la base de datos."));
+                .body(Map.of("error", "Correo o contraseña incorrectos."));
         }
 
-        boolean passValida = pass.equals(user.getPasswordHash()) 
-            || passwordService.checkPassword(pass, user.getPasswordHash());
-
-        if (!passValida) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(Map.of("error", "Contraseña incorrecta."));
+        if (passwordService.needsUpgrade(user.getPasswordHash())) {
+            user.setPasswordHash(passwordService.hashPassword(pass));
+            userRepository.save(user);
         }
 
         String token = jwtService.generarToken(
@@ -57,7 +57,9 @@ public class AuthController {
             user.getEmail(),
             user.getRole(),
             user.getCompany().getId(),
-            user.getCompany().getName()
+            user.getCompany().getName(),
+            user.isMustChangePassword(),
+            platformProperties.isPlatformAdmin(user.getEmail())
         ));
     }
 
@@ -70,6 +72,8 @@ public class AuthController {
         String email,
         String role,
         UUID companyId,
-        String companyName
+        String companyName,
+        boolean mustChangePassword,
+        boolean platformAdmin
     ) {}
 }

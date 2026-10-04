@@ -22,7 +22,7 @@ import java.util.UUID;
 @Component
 interface ConversationRepositoryReader extends JpaRepository<Conversation, UUID> {
 
-    @Query("SELECT c FROM Conversation c JOIN FETCH c.customer WHERE c.id = :id")
+    @Query("SELECT c FROM Conversation c JOIN FETCH c.customer JOIN FETCH c.company WHERE c.id = :id")
     java.util.Optional<Conversation> buscarPorIdConCliente(UUID id);
 
     default Conversation buscarConCliente(UUID id) {

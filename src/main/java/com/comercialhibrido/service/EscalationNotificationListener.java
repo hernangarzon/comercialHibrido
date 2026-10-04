@@ -2,6 +2,7 @@ package com.comercialhibrido.service;
 
 import com.comercialhibrido.domain.entity.Conversation;
 import com.comercialhibrido.domain.event.ConversationEscalatedEvent;
+import com.comercialhibrido.security.WebSocketAuthInterceptor;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,6 +38,7 @@ public class EscalationNotificationListener {
         Conversation conversation = conversationRepositoryReader.buscarConCliente(event.conversationId());
 
         EscalationNotification notification = new EscalationNotification(
+            "ESCALATION",
             conversation.getId().toString(),
             conversation.getCustomer().getPhoneNumber(),
             conversation.getCustomer().getDisplayName(),
@@ -44,11 +46,16 @@ public class EscalationNotificationListener {
             event.leadScore()
         );
 
-        messagingTemplate.convertAndSend("/topic/conversaciones", notification);
+        // Cada empresa solo recibe las escalaciones de sus propias conversaciones.
+        messagingTemplate.convertAndSend(
+            WebSocketAuthInterceptor.COMPANY_TOPIC_PREFIX + conversation.getCompany().getId(),
+            notification
+        );
         log.info("Notificacion de escalacion enviada al panel para conversacion {}.", event.conversationId());
     }
 
     private record EscalationNotification(
+        String type,
         String conversationId,
         String customerPhone,
         String customerName,

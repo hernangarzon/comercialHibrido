@@ -1,17 +1,23 @@
 package com.comercialhibrido.service;
 
 import com.comercialhibrido.config.AgentProperties;
+import com.comercialhibrido.domain.entity.Company;
+import com.comercialhibrido.domain.entity.Conversation;
 import com.comercialhibrido.domain.entity.InboundMessageJob;
 import com.comercialhibrido.domain.entity.Message;
 import com.comercialhibrido.domain.entity.OutboundMessageJob;
 import com.comercialhibrido.domain.enums.DeliveryStatus;
+import com.comercialhibrido.domain.event.ConversationActivityEvent;
 import com.comercialhibrido.domain.enums.JobStatus;
+import com.comercialhibrido.repository.ConversationRepository;
 import com.comercialhibrido.repository.InboundMessageJobRepository;
 import com.comercialhibrido.repository.MessageRepository;
 import com.comercialhibrido.repository.OutboundMessageJobRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -23,10 +29,12 @@ import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(name = "agent.worker-enabled", havingValue = "true", matchIfMissing = true)
 public class MessageJobWorker {
 
     private static final Logger log = LoggerFactory.getLogger(MessageJobWorker.class);
 
+    private final ConversationRepository conversationRepository;
     private final InboundMessageJobRepository inboundMessageJobRepository;
     private final OutboundMessageJobRepository outboundMessageJobRepository;
     private final MessageRepository messageRepository;
@@ -34,6 +42,7 @@ public class MessageJobWorker {
     private final WhatsAppMessageSender whatsAppMessageSender;
     private final AgentProperties agentProperties;
     private final TransactionTemplate transactionTemplate;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Scheduled(fixedDelayString = "${agent.worker-fixed-delay-ms:1000}")
     public void runCycle() {
@@ -72,7 +81,8 @@ public class MessageJobWorker {
                 continue;
             }
             try {
-                String externalId = whatsAppMessageSender.enviarTexto(claim.toPhoneNumber(), claim.body());
+                String externalId = whatsAppMessageSender.enviarTexto(
+                    claim.phoneNumberId(), claim.accessToken(), claim.toPhoneNumber(), claim.body());
                 completeOutbound(claim.id(), externalId);
             } catch (Exception e) {
                 retryOutbound(claim.id(), e);
@@ -81,25 +91,39 @@ public class MessageJobWorker {
     }
 
     private InboundClaim claimInbound(UUID id) {
-        return transactionTemplate.execute(status -> inboundMessageJobRepository.findById(id)
-            .filter(job -> job.getStatus() == JobStatus.PENDING)
-            .map(job -> {
-                job.markProcessing();
-                inboundMessageJobRepository.saveAndFlush(job);
-                return new InboundClaim(job.getId(), job.getConversationId());
-            })
-            .orElse(null));
+        return transactionTemplate.execute(status -> {
+            // UPDATE condicional: si otra instancia ya lo tomó, afecta 0 filas y se omite.
+            if (inboundMessageJobRepository.claim(id, Instant.now()) == 0) {
+                return null;
+            }
+            return inboundMessageJobRepository.findById(id)
+                .map(job -> new InboundClaim(job.getId(), job.getConversationId()))
+                .orElse(null);
+        });
     }
 
     private OutboundClaim claimOutbound(UUID id) {
-        return transactionTemplate.execute(status -> outboundMessageJobRepository.findById(id)
-            .filter(job -> job.getStatus() == JobStatus.PENDING)
-            .map(job -> {
-                job.markProcessing();
-                outboundMessageJobRepository.saveAndFlush(job);
-                return new OutboundClaim(job.getId(), job.getToPhoneNumber(), job.getBody());
-            })
-            .orElse(null));
+        return transactionTemplate.execute(status -> {
+            if (outboundMessageJobRepository.claim(id, Instant.now()) == 0) {
+                return null;
+            }
+            return outboundMessageJobRepository.findById(id)
+                .map(job -> {
+                    // Se envía desde el número de la empresa dueña de la conversación;
+                    // si la empresa no tiene credenciales propias, el sender usa las globales.
+                    Company company = conversationRepository.findById(job.getConversationId())
+                        .map(Conversation::getCompany)
+                        .orElse(null);
+                    return new OutboundClaim(
+                        job.getId(),
+                        job.getToPhoneNumber(),
+                        job.getBody(),
+                        company != null ? company.getWhatsappPhoneNumberId() : null,
+                        company != null ? company.getWhatsappAccessToken() : null
+                    );
+                })
+                .orElse(null);
+        });
     }
 
     private void completeInbound(UUID id) {
@@ -118,6 +142,8 @@ public class MessageJobWorker {
                 message.setDeliveryStatus(DeliveryStatus.SENT);
                 messageRepository.save(message);
             });
+            eventPublisher.publishEvent(
+                new ConversationActivityEvent(job.getConversationId(), ConversationActivityEvent.Type.DELIVERY));
         }));
     }
 
@@ -143,6 +169,10 @@ public class MessageJobWorker {
                     messageRepository.save(message);
                 }
             });
+            if (exhausted) {
+                eventPublisher.publishEvent(
+                    new ConversationActivityEvent(job.getConversationId(), ConversationActivityEvent.Type.DELIVERY));
+            }
             log.error("Fallo enviando job saliente {} (agotado={}): {}", id, exhausted,
                 error.getMessage(), error);
         }));
@@ -180,5 +210,6 @@ public class MessageJobWorker {
     }
 
     private record InboundClaim(UUID id, UUID conversationId) {}
-    private record OutboundClaim(UUID id, String toPhoneNumber, String body) {}
+    private record OutboundClaim(
+        UUID id, String toPhoneNumber, String body, String phoneNumberId, String accessToken) {}
 }

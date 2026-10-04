@@ -9,7 +9,9 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.context.ApplicationEventPublisher;
+import com.comercialhibrido.domain.event.ConversationActivityEvent;
 
 import java.util.Locale;
 
@@ -21,6 +23,7 @@ public class WhatsAppDeliveryStatusService {
 
     private final OutboundMessageJobRepository outboundMessageJobRepository;
     private final MessageRepository messageRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public void processStatus(WhatsAppWebhookPayload.StatusUpdate update) {
@@ -39,6 +42,8 @@ public class WhatsAppDeliveryStatusService {
             messageRepository.findById(job.getMessageId()).ifPresent(message ->
                 updateMessage(message, deliveryStatus, update.errorSummary())
             );
+            eventPublisher.publishEvent(
+                new ConversationActivityEvent(job.getConversationId(), ConversationActivityEvent.Type.DELIVERY));
         });
     }
 

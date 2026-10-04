@@ -61,6 +61,12 @@
 			<artifactId>spring-boot-starter-websocket</artifactId>
 		</dependency>
 
+		<!-- BCrypt para las contraseñas del panel (solo la librería de cifrado, sin Spring Security) -->
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-crypto</artifactId>
+		</dependency>
+
 		<!-- Boilerplate de entidades -->
 		<dependency>
 			<groupId>org.projectlombok</groupId>
@@ -74,10 +80,18 @@
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<!-- PostgreSQL real embebido para probar las migraciones Flyway en los tests -->
+		<dependency>
+			<groupId>io.zonky.test</groupId>
+			<artifactId>embedded-postgres</artifactId>
+			<version>2.1.0</version>
+			<scope>test</scope>
+		</dependency>
+		<!-- Base en memoria para el perfil dev (demos sin PostgreSQL) y para los tests -->
 		<dependency>
 			<groupId>com.h2database</groupId>
 			<artifactId>h2</artifactId>
-			<scope>test</scope>
+			<scope>runtime</scope>
 		</dependency>
 	</dependencies>
 

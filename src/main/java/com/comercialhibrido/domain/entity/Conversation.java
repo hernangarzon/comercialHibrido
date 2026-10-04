@@ -56,6 +56,9 @@ public class Conversation {
     /** Marca de tiempo del mensaje mas reciente cubierto por 'summary'. */
     private Instant lastSummarizedAt;
 
+    /** Momento de la última escalación a un asesor (métricas del dashboard). */
+    private Instant escalatedAt;
+
     /**
      * Puntaje de intencion de compra (0-100) devuelto por el LLM de forma
      * estructurada en cada respuesta. Se usa para decidir si se dispara
@@ -82,9 +85,10 @@ public class Conversation {
 
     @PrePersist
     void onCreate() {
+        // Respeta fechas ya asignadas (importaciones o datos de demostración).
         Instant now = Instant.now();
-        this.createdAt = now;
-        this.updatedAt = now;
+        if (this.createdAt == null) this.createdAt = now;
+        if (this.updatedAt == null) this.updatedAt = now;
         if (this.status == null) {
             this.status = ConversationStatus.BOT_ACTIVO;
         }

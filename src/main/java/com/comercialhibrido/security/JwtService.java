@@ -19,11 +19,21 @@ public class JwtService {
 
     private static final Logger log = LoggerFactory.getLogger(JwtService.class);
 
-    @Value("${agent.jwt.secret:MiClaveSuperSecretaParaFirmarTokensJWTComercialHibrido2026*}")
-    private String secretKey;
+    private static final int MIN_SECRET_LENGTH = 32;
+
+    private final String secretKey;
 
     private static final long EXPIRATION_HOURS = 24 * 7; // 7 días de validez
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    public JwtService(@Value("${agent.jwt.secret:}") String secretKey) {
+        // Sin secreto propio cualquiera podria firmar tokens validos: se aborta el arranque.
+        if (secretKey == null || secretKey.length() < MIN_SECRET_LENGTH) {
+            throw new IllegalStateException(
+                "AGENT_JWT_SECRET no está definido o tiene menos de " + MIN_SECRET_LENGTH + " caracteres.");
+        }
+        this.secretKey = secretKey;
+    }
 
     public String generarToken(UUID userId, UUID companyId, String email, String name, String role) {
         try {
@@ -63,7 +73,8 @@ public class JwtService {
             String dataToSign = parts[0] + "." + parts[1];
             String expectedSignature = hmacSha256(dataToSign, secretKey);
 
-            if (!expectedSignature.equals(parts[2])) {
+            if (!java.security.MessageDigest.isEqual(
+                    expectedSignature.getBytes(StandardCharsets.US_ASCII), parts[2].getBytes(StandardCharsets.US_ASCII))) {
                 log.warn("Firma de JWT inválida.");
                 return null;
             }

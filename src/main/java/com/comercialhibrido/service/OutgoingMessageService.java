@@ -10,7 +10,9 @@ import com.comercialhibrido.domain.enums.MessageSender;
 import com.comercialhibrido.exception.IllegalTransitionException;
 import com.comercialhibrido.repository.MessageRepository;
 import com.comercialhibrido.repository.OutboundMessageJobRepository;
+import com.comercialhibrido.domain.event.ConversationActivityEvent;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +26,7 @@ public class OutgoingMessageService {
     private final ConversationRepositoryReader conversationRepositoryReader;
     private final MessageRepository messageRepository;
     private final OutboundMessageJobRepository outboundMessageJobRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public void enviarMensajeComercial(UUID conversationId, String content) {
@@ -58,5 +61,7 @@ public class OutgoingMessageService {
                 .nextAttemptAt(Instant.now())
                 .build()
         );
+        eventPublisher.publishEvent(
+            new ConversationActivityEvent(conversation.getId(), ConversationActivityEvent.Type.NEW_MESSAGE));
     }
 }

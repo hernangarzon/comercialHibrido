@@ -14,7 +14,9 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.context.ApplicationEventPublisher;
+import com.comercialhibrido.domain.event.ConversationActivityEvent;
 
 import java.time.Instant;
 import java.util.List;
@@ -35,6 +37,7 @@ public class BotResponseService {
     private final MessageRepository messageRepository;
     private final OutboundMessageJobRepository outboundMessageJobRepository;
     private final ConversationStateService conversationStateService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public void generarYEncolarRespuesta(UUID conversationId) {
@@ -58,6 +61,9 @@ public class BotResponseService {
 
             if (debeEscalar) {
                 conversationStateService.escalar(conversationId, answer.leadScore());
+            } else if (answer.leadScore() != null) {
+                // Antes el score solo se guardaba al escalar; el panel mostraba 0 en el resto.
+                conversation.setLeadScore(answer.leadScore());
             }
 
         } catch (Exception e) {
@@ -91,5 +97,7 @@ public class BotResponseService {
                 .nextAttemptAt(Instant.now())
                 .build()
         );
+        eventPublisher.publishEvent(
+            new ConversationActivityEvent(conversation.getId(), ConversationActivityEvent.Type.BOT_REPLY));
     }
 }

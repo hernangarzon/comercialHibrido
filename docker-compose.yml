@@ -27,6 +27,7 @@ services:
       DB_USERNAME: ${POSTGRES_USER:-comercial}
       DB_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD}
       AGENT_KNOWLEDGE_BASE_FILE: /app/config/knowledge-base.md
+      SERVER_PORT: "8080"
     ports:
       - "8080:8080"
     volumes:

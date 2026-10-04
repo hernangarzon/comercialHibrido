@@ -64,7 +64,10 @@ public class Message {
 
     @PrePersist
     void onCreate() {
-        this.createdAt = Instant.now();
+        // Respeta una fecha ya asignada (importaciones o datos de demostración).
+        if (this.createdAt == null) {
+            this.createdAt = Instant.now();
+        }
         if (this.deliveryStatus == null) {
             this.deliveryStatus = DeliveryStatus.PENDING;
         }

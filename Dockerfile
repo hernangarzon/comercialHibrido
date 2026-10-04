@@ -1,3 +1,11 @@
+# 0. PANEL WEB (React + Vite): se compila hacia src/main/resources/static
+FROM node:24-alpine AS frontend
+WORKDIR /app/frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
+
 # 1. ETAPA DE CONSTRUCCIÓN (BUILD)
 FROM eclipse-temurin:21-jdk-alpine AS builder
 WORKDIR /app
@@ -10,6 +18,7 @@ RUN chmod +x ./mvnw && ./mvnw dependency:go-offline -B
 
 # Copiar código fuente y compilar JAR
 COPY src ./src
+COPY --from=frontend /app/src/main/resources/static ./src/main/resources/static
 RUN ./mvnw clean package -DskipTests
 
 # 2. ETAPA DE EJECUCIÓN (RUNTIME LIGERO)

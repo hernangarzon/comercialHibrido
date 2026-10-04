@@ -19,11 +19,17 @@ public class WhatsAppMediaService {
     private final WhatsAppProperties whatsAppProperties;
     private final RestClient.Builder restClientBuilder;
 
-    public ResponseEntity<byte[]> descargarArchivo(String mediaId) {
+    /**
+     * @param accessToken token de la empresa dueña del archivo; si es nulo se usa el global.
+     */
+    public ResponseEntity<byte[]> descargarArchivo(String mediaId, String accessToken) {
+        String token = (accessToken != null && !accessToken.isBlank())
+            ? accessToken
+            : whatsAppProperties.accessToken();
         try {
-            RestClient client = restClientBuilder
+            RestClient client = restClientBuilder.clone()
                 .baseUrl(whatsAppProperties.apiBaseUrl())
-                .defaultHeader("Authorization", "Bearer " + whatsAppProperties.accessToken())
+                .defaultHeader("Authorization", "Bearer " + token)
                 .build();
 
             // 1. Obtener la URL temporal del archivo desde Meta
@@ -37,10 +43,10 @@ public class WhatsAppMediaService {
             }
 
             // 2. Descargar los bytes reales del archivo
-            RestClient downloadClient = restClientBuilder.build();
+            RestClient downloadClient = restClientBuilder.clone().build();
             byte[] fileBytes = downloadClient.get()
                 .uri(metaMedia.url())
-                .header("Authorization", "Bearer " + whatsAppProperties.accessToken())
+                .header("Authorization", "Bearer " + token)
                 .retrieve()
                 .body(byte[].class);
 

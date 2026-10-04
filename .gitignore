@@ -32,3 +32,6 @@ build/
 *.log
 .env
 .DS_Store
+
+### Panel web compilado (lo genera "npm run build" en frontend/) ###
+src/main/resources/static/

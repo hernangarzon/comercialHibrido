@@ -15,10 +15,18 @@ public class WhatsAppSignatureVerifier {
 
     private final AgentProperties agentProperties;
 
-    public boolean isValid(String rawBody, String signatureHeader) {
+    public boolean isConfigured() {
         String secret = agentProperties.whatsappAppSecret();
-        if (secret == null || secret.isBlank()) {
-            return true;
+        return secret != null && !secret.isBlank();
+    }
+
+    /**
+     * Valida X-Hub-Signature-256 sobre los bytes exactos recibidos. Sin App Secret
+     * configurado rechaza todo: aceptar sin verificar permitiria inyectar mensajes falsos.
+     */
+    public boolean isValid(byte[] rawBody, String signatureHeader) {
+        if (!isConfigured()) {
+            return false;
         }
         if (rawBody == null || signatureHeader == null || !signatureHeader.startsWith("sha256=")) {
             return false;
@@ -26,8 +34,9 @@ public class WhatsAppSignatureVerifier {
 
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            byte[] digest = mac.doFinal(rawBody.getBytes(StandardCharsets.UTF_8));
+            mac.init(new SecretKeySpec(
+                agentProperties.whatsappAppSecret().getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            byte[] digest = mac.doFinal(rawBody);
             String expected = "sha256=" + toHex(digest);
             return MessageDigest.isEqual(
                 expected.getBytes(StandardCharsets.US_ASCII),

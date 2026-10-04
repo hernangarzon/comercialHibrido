@@ -60,6 +60,19 @@ public class ConversationContextBuilder {
         return mensajes;
     }
 
+    /**
+     * Contexto para el probador del panel: mismo prompt y catálogo que en producción,
+     * con un historial simulado en lugar de una conversación real.
+     */
+    public List<ChatMessage> construirPrueba(Company company, List<ChatMessage> historial) {
+        List<Product> productos = productRepository.findByCompanyIdAndAvailableTrueOrderByNameAsc(company.getId());
+        List<ChatMessage> mensajes = new ArrayList<>();
+        mensajes.add(new ChatMessage("system",
+            construirSystemPrompt(company, "Cliente de prueba", formatearCatalogoProductos(productos))));
+        mensajes.addAll(historial);
+        return mensajes;
+    }
+
     private String formatearCatalogoProductos(List<Product> productos) {
         if (productos == null || productos.isEmpty()) {
             return "No hay productos cargados en el inventario actualmente.";

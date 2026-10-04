@@ -4,7 +4,6 @@ import com.comercialhibrido.domain.entity.Conversation;
 import com.comercialhibrido.domain.entity.Message;
 import com.comercialhibrido.domain.enums.ConversationStatus;
 import com.comercialhibrido.dto.SendMessageRequest;
-import com.comercialhibrido.dto.TomarControlRequest;
 import com.comercialhibrido.exception.IllegalTransitionException;
 import com.comercialhibrido.repository.ConversationRepository;
 import com.comercialhibrido.repository.MessageRepository;
@@ -16,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.List;
@@ -26,6 +26,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ConversationController {
 
+    // Atributo que PanelTokenFilter rellena con el JWT validado.
+    private static final String AUTH_ATTRIBUTE = "authenticatedUser";
+
     private final ConversationRepository conversationRepository;
     private final MessageRepository messageRepository;
     private final ConversationStateService conversationStateService;
@@ -33,33 +36,22 @@ public class ConversationController {
 
     /**
      * Lista conversaciones filtrando por estado.
-     * Toma automáticamente la empresa (companyId) del usuario que inició sesión.
+     * La empresa sale siempre del JWT del usuario que inició sesión.
      */
     @GetMapping
     public ResponseEntity<List<ConversationSummaryResponse>> listarConversaciones(
         @RequestParam(value = "status", required = false) ConversationStatus status,
-        @RequestParam(value = "companyId", required = false) UUID paramCompanyId,
-        @RequestAttribute(value = "authenticatedUser", required = false) JwtService.JwtPayload user
+        @RequestAttribute(AUTH_ATTRIBUTE) JwtService.JwtPayload user
     ) {
-        // Prioriza la empresa del usuario logueado, o usa el parámetro si existe
-        UUID companyId = (user != null) ? user.companyId() : paramCompanyId;
-        List<Conversation> conversaciones;
-
-        if (companyId != null && status != null) {
-            conversaciones = conversationRepository.findByCompanyIdAndStatusOrderByUpdatedAtDesc(companyId, status);
-        } else if (companyId != null) {
-            conversaciones = conversationRepository.findByCompanyIdOrderByUpdatedAtDesc(companyId);
-        } else if (status != null) {
-            conversaciones = conversationRepository.findByStatusOrderByUpdatedAtDesc(status);
-        } else {
-            conversaciones = conversationRepository.findAll();
-        }
+        UUID companyId = user.companyId();
+        List<Conversation> conversaciones = (status != null)
+            ? conversationRepository.findByCompanyIdAndStatusOrderByUpdatedAtDesc(companyId, status)
+            : conversationRepository.findByCompanyIdOrderByUpdatedAtDesc(companyId);
 
         List<ConversationSummaryResponse> response = conversaciones.stream()
             .map(c -> {
                 Message ultimoMsg = messageRepository.findFirstByConversationIdOrderByCreatedAtDesc(c.getId()).orElse(null);
-                String preview = ultimoMsg != null ? ultimoMsg.getContent() : "";
-                return ConversationSummaryResponse.from(c, preview);
+                return ConversationSummaryResponse.from(c, ultimoMsg);
             })
             .toList();
 
@@ -68,8 +60,10 @@ public class ConversationController {
 
     @GetMapping("/{id}/mensajes")
     public ResponseEntity<List<MessageDetailResponse>> obtenerHistorial(
-        @PathVariable("id") UUID conversationId
+        @PathVariable("id") UUID conversationId,
+        @RequestAttribute(AUTH_ATTRIBUTE) JwtService.JwtPayload user
     ) {
+        verificarPertenencia(conversationId, user);
         List<Message> mensajes = messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId);
         List<MessageDetailResponse> response = mensajes.stream()
             .map(MessageDetailResponse::from)
@@ -81,25 +75,30 @@ public class ConversationController {
     @PostMapping("/{id}/tomar-control")
     public ResponseEntity<ConversationSummaryResponse> tomarControl(
         @PathVariable("id") UUID conversationId,
-        @RequestBody(required = false) TomarControlRequest request
+        @RequestAttribute(AUTH_ATTRIBUTE) JwtService.JwtPayload user
     ) {
-        UUID salespersonId = request != null ? request.salespersonId() : null;
-        Conversation conversation = conversationStateService.tomarControl(conversationId, salespersonId);
+        verificarPertenencia(conversationId, user);
+        // El comercial asignado es quien hace la petición, no un id enviado por el cliente.
+        Conversation conversation = conversationStateService.tomarControl(conversationId, user.userId());
         return ResponseEntity.ok(ConversationSummaryResponse.from(conversation, null));
     }
 
     @PostMapping("/{id}/liberar-control")
     public ResponseEntity<ConversationSummaryResponse> liberarControl(
-        @PathVariable("id") UUID conversationId
+        @PathVariable("id") UUID conversationId,
+        @RequestAttribute(AUTH_ATTRIBUTE) JwtService.JwtPayload user
     ) {
+        verificarPertenencia(conversationId, user);
         Conversation conversation = conversationStateService.liberarControl(conversationId);
         return ResponseEntity.ok(ConversationSummaryResponse.from(conversation, null));
     }
 
     @PostMapping("/{id}/archivar")
     public ResponseEntity<ConversationSummaryResponse> archivar(
-        @PathVariable("id") UUID conversationId
+        @PathVariable("id") UUID conversationId,
+        @RequestAttribute(AUTH_ATTRIBUTE) JwtService.JwtPayload user
     ) {
+        verificarPertenencia(conversationId, user);
         Conversation conversation = conversationStateService.archivar(conversationId);
         return ResponseEntity.ok(ConversationSummaryResponse.from(conversation, null));
     }
@@ -107,10 +106,21 @@ public class ConversationController {
     @PostMapping("/{id}/mensajes")
     public ResponseEntity<Void> enviarMensaje(
         @PathVariable("id") UUID conversationId,
-        @Valid @RequestBody SendMessageRequest request
+        @Valid @RequestBody SendMessageRequest request,
+        @RequestAttribute(AUTH_ATTRIBUTE) JwtService.JwtPayload user
     ) {
+        verificarPertenencia(conversationId, user);
         outgoingMessageService.enviarMensajeComercial(conversationId, request.content());
         return ResponseEntity.accepted().build();
+    }
+
+    /**
+     * Responde 404 (no 403) si la conversación es de otra empresa, para no revelar que existe.
+     */
+    private void verificarPertenencia(UUID conversationId, JwtService.JwtPayload user) {
+        if (!conversationRepository.existsByIdAndCompanyId(conversationId, user.companyId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Conversación no encontrada");
+        }
     }
 
     @ExceptionHandler(IllegalTransitionException.class)
@@ -125,9 +135,14 @@ public class ConversationController {
         String status,
         Integer leadScore,
         String lastMessage,
+        String lastMessageSender,
+        Instant lastMessageAt,
+        String summary,
+        UUID assignedSalespersonId,
+        Instant createdAt,
         Instant updatedAt
     ) {
-        static ConversationSummaryResponse from(Conversation c, String lastMessage) {
+        static ConversationSummaryResponse from(Conversation c, Message lastMessage) {
             String name = (c.getCustomer() != null && c.getCustomer().getDisplayName() != null) 
                 ? c.getCustomer().getDisplayName() 
                 : "Sin Nombre";
@@ -139,7 +154,12 @@ public class ConversationController {
                 phone,
                 c.getStatus().name(),
                 c.getLeadScore(),
-                lastMessage,
+                lastMessage != null ? lastMessage.getContent() : null,
+                lastMessage != null ? lastMessage.getSender().name() : null,
+                lastMessage != null ? lastMessage.getCreatedAt() : null,
+                c.getSummary(),
+                c.getAssignedSalespersonId(),
+                c.getCreatedAt(),
                 c.getUpdatedAt()
             );
         }
@@ -152,6 +172,8 @@ public class ConversationController {
         String mediaType,
         String mediaId,
         String mediaFilename,
+        String deliveryStatus,
+        String deliveryError,
         Instant createdAt
     ) {
         static MessageDetailResponse from(Message m) {
@@ -162,8 +184,10 @@ public class ConversationController {
                 m.getMediaType() != null ? m.getMediaType() : "TEXT",
                 m.getMediaId(),
                 m.getMediaFilename(),
+                m.getDeliveryStatus() != null ? m.getDeliveryStatus().name() : null,
+                m.getDeliveryError(),
                 m.getCreatedAt()
             );
         }
     }
-}
+}
