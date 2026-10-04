@@ -61,6 +61,18 @@ Se requiere Java 21 y Node.js 20+ (para el panel). Copia `.env.example` a `.env`
 
 El endpoint de salud es `GET /health`. El webhook se publica en `POST /webhook/whatsapp` y la verificación de Meta se realiza mediante `GET /webhook/whatsapp`.
 
+## Despliegue en Railway
+
+El repositorio incluye `railway.json`: Railway construye con el `Dockerfile` (panel + backend), revisa `/health` y reinicia ante fallos. La app escucha en el `PORT` que asigna Railway y respeta su proxy HTTPS.
+
+1. En Railway: **New Project → Deploy from GitHub repo** y elige este repositorio (rama `main`). Cada push a `main` vuelve a desplegar.
+2. En el servicio, **Variables → Raw Editor**: pega las variables de tu `.env` (no hace falta `SERVER_PORT`). Mínimo: `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `OPENAI_API_KEY`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`, `AGENT_JWT_SECRET`, `PLATFORM_ADMIN_EMAILS` (y opcionales `OPENAI_API_BASE_URL`, `OPENAI_MODEL`, `WHATSAPP_API_BASE_URL`, `SALES_WHATSAPP`).
+3. **Settings → Networking → Generate Domain** para obtener la URL pública `https://<tu-app>.up.railway.app` (o conecta un dominio propio).
+4. En Meta (tu app → WhatsApp → Configuración): **URL de devolución de llamada** `https://<tu-app>.up.railway.app/webhook/whatsapp`, **token de verificación** = `WHATSAPP_WEBHOOK_VERIFY_TOKEN`, y suscríbete al campo `messages`.
+5. Comprueba: `https://<tu-app>.up.railway.app/health` responde `UP`, la landing carga en `/` y el panel en `/app/`.
+
+Mantén una sola réplica mientras el volumen sea bajo (el worker admite varias, pero no hace falta). Las migraciones Flyway se aplican solas al arrancar.
+
 ## Ejecución 24/7 con Docker Compose
 
 ```bash

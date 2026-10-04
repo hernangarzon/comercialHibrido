@@ -32,8 +32,9 @@ USER appuser
 # Copiar el artefacto compilado
 COPY --from=builder /app/target/*.jar app.jar
 
-# Puerto de Railway
+# Railway inyecta PORT en ejecución; 8080 es el valor por defecto (Docker Compose).
 EXPOSE 8080
 ENV PORT=8080
 
-ENTRYPOINT ["java", "-Djava.security.egd=file:/dev/./urandom", "-jar", "app.jar"]
+# MaxRAMPercentage: el heap se ajusta a la memoria del contenedor en lugar de la del servidor.
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-Djava.security.egd=file:/dev/./urandom", "-jar", "app.jar"]
