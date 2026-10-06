@@ -15,6 +15,8 @@ class JwtServiceTest {
     void noArrancaSinSecretoOConSecretoCorto() {
         assertThatThrownBy(() -> new JwtService("")).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> new JwtService("corto")).isInstanceOf(IllegalStateException.class);
+        // El valor de ejemplo de .env.example es público: no debe aceptarse aunque sea largo.
+        assertThatThrownBy(() -> new JwtService("genera-uno-con-openssl-rand-base64-48")).isInstanceOf(IllegalStateException.class);
     }
 
     @Test

@@ -32,6 +32,11 @@ public class JwtService {
             throw new IllegalStateException(
                 "AGENT_JWT_SECRET (o JWT_SECRET) no está definido o tiene menos de " + MIN_SECRET_LENGTH + " caracteres.");
         }
+        // Los valores de ejemplo de .env.example son públicos: usarlos equivale a no tener secreto.
+        if (secretKey.startsWith("genera-uno")) {
+            throw new IllegalStateException(
+                "AGENT_JWT_SECRET tiene el valor de ejemplo. Genera uno propio (p. ej. openssl rand -base64 48).");
+        }
         this.secretKey = secretKey;
     }
 
