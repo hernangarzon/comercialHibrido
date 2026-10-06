@@ -30,7 +30,7 @@ public class JwtService {
         // Sin secreto propio cualquiera podria firmar tokens validos: se aborta el arranque.
         if (secretKey == null || secretKey.length() < MIN_SECRET_LENGTH) {
             throw new IllegalStateException(
-                "AGENT_JWT_SECRET no está definido o tiene menos de " + MIN_SECRET_LENGTH + " caracteres.");
+                "AGENT_JWT_SECRET (o JWT_SECRET) no está definido o tiene menos de " + MIN_SECRET_LENGTH + " caracteres.");
         }
         this.secretKey = secretKey;
     }
