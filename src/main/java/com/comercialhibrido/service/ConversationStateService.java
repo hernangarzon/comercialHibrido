@@ -9,11 +9,13 @@ import com.comercialhibrido.repository.ConversationRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -26,10 +28,45 @@ public class ConversationStateService {
     private final ConversationRepository conversationRepository;
     private final ApplicationEventPublisher eventPublisher;
 
+    /** Minutos sin que el asesor escriba tras tomar el control para que el bot la retome. */
+    @Value("${agent.human-idle-minutes:30}")
+    private long humanIdleMinutes = 30;
+
+    /**
+     * El bot atiende siempre, también mientras una conversación espera a un asesor
+     * (ESCALADO_PENDIENTE): el cliente nunca debe quedar sin respuesta. Solo calla
+     * cuando un asesor tomó el control y está activo.
+     */
     public boolean debeResponderBot(Conversation conversation) {
-        // El bot SOLO responde si está en BOT_ACTIVO.
-        // Si está en ESCALADO_PENDIENTE, HUMANO_CONTROL o ARCHIVADO, guarda silencio.
-        return conversation.getStatus() == ConversationStatus.BOT_ACTIVO;
+        return conversation.getStatus() == ConversationStatus.BOT_ACTIVO
+            || conversation.getStatus() == ConversationStatus.ESCALADO_PENDIENTE;
+    }
+
+    /**
+     * Un asesor tomó el control pero no escribió en {@code humanIdleMinutes} (contados desde
+     * que lo tomó o desde su último mensaje): el cliente no puede quedar esperando.
+     */
+    public boolean asesorInactivo(Conversation conversation, Instant lastAgentMessageAt, Instant now) {
+        if (conversation.getStatus() != ConversationStatus.HUMANO_CONTROL) {
+            return false;
+        }
+        Instant ultimaActividad = latest(conversation.getTakenAt(), lastAgentMessageAt);
+        // Sin registro de cuándo lo tomó (datos anteriores a V5) se considera inactivo.
+        return ultimaActividad == null || ultimaActividad.isBefore(now.minus(Duration.ofMinutes(humanIdleMinutes)));
+    }
+
+    /**
+     * Devuelve al bot una conversación abandonada por el asesor. Queda como escalada
+     * (sigue visible para el equipo) sin volver a disparar la alerta.
+     */
+    @Transactional
+    public Conversation retomarPorInactividad(UUID conversationId) {
+        Conversation conversation = obtenerOFallar(conversationId);
+        conversation.setStatus(ConversationStatus.ESCALADO_PENDIENTE);
+        conversation.setAssignedSalespersonId(null);
+        conversation.setTakenAt(null);
+        log.info("Conversación {} vuelve al bot: el asesor no respondió en {} min.", conversationId, humanIdleMinutes);
+        return guardarConManejoDeConflicto(conversation);
     }
 
     @Transactional
@@ -37,6 +74,7 @@ public class ConversationStateService {
         Conversation conversation = obtenerOFallar(conversationId);
         conversation.setStatus(ConversationStatus.HUMANO_CONTROL);
         conversation.setAssignedSalespersonId(salespersonId);
+        conversation.setTakenAt(Instant.now());
         return guardarConManejoDeConflicto(conversation);
     }
 
@@ -45,6 +83,7 @@ public class ConversationStateService {
         Conversation conversation = obtenerOFallar(conversationId);
         conversation.setStatus(ConversationStatus.BOT_ACTIVO);
         conversation.setAssignedSalespersonId(null);
+        conversation.setTakenAt(null);
         return guardarConManejoDeConflicto(conversation);
     }
 
@@ -53,18 +92,28 @@ public class ConversationStateService {
         Conversation conversation = obtenerOFallar(conversationId);
         conversation.setStatus(ConversationStatus.ARCHIVADO);
         conversation.setAssignedSalespersonId(null);
+        conversation.setTakenAt(null);
         log.info("Conversación {} archivada.", conversationId);
         return guardarConManejoDeConflicto(conversation);
     }
 
+    /**
+     * Avisa al equipo que la conversación necesita un asesor. Si ya estaba escalada o en
+     * manos de un asesor, solo actualiza score y resumen: la alerta no se repite con cada
+     * mensaje del cliente y se conserva la hora de la primera escalación (métricas).
+     */
     @Transactional
-    public Conversation escalar(UUID conversationId, int leadScore) {
+    public Conversation escalar(UUID conversationId, int leadScore, String resumen) {
         Conversation conversation = obtenerOFallar(conversationId);
         conversation.setLeadScore(leadScore);
+        if (resumen != null && !resumen.isBlank()) {
+            conversation.setSummary(resumen.strip());
+            conversation.setLastSummarizedAt(Instant.now());
+        }
 
-        if (conversation.getStatus() == ConversationStatus.HUMANO_CONTROL) {
-            log.debug("Conversacion {} ya esta en HUMANO_CONTROL, se actualiza leadScore sin re-escalar.",
-                conversationId);
+        if (conversation.getStatus() == ConversationStatus.HUMANO_CONTROL
+            || conversation.getStatus() == ConversationStatus.ESCALADO_PENDIENTE) {
+            log.debug("Conversación {} ya está con el equipo; se actualiza score/resumen sin nueva alerta.", conversationId);
             return guardarConManejoDeConflicto(conversation);
         }
 
@@ -73,9 +122,15 @@ public class ConversationStateService {
         Conversation actualizada = guardarConManejoDeConflicto(conversation);
 
         eventPublisher.publishEvent(new ConversationEscalatedEvent(conversationId, leadScore));
-        log.info("Conversacion {} escalada con leadScore={}.", conversationId, leadScore);
+        log.info("Conversación {} escalada con leadScore={}.", conversationId, leadScore);
 
         return actualizada;
+    }
+
+    private static Instant latest(Instant a, Instant b) {
+        if (a == null) return b;
+        if (b == null) return a;
+        return a.isAfter(b) ? a : b;
     }
 
     private Conversation obtenerOFallar(UUID conversationId) {

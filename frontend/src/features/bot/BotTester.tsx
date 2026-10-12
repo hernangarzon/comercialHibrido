@@ -6,10 +6,10 @@ import { Button, IconButton, ScoreBadge } from '../../components/ui'
 import { api, type BotAnswer, type PreviewMessage } from '../../lib/api'
 
 interface Turn extends PreviewMessage {
-  meta?: Pick<BotAnswer, 'leadScore' | 'requiereEscalamiento'>
+  meta?: Pick<BotAnswer, 'leadScore' | 'requiereEscalamiento' | 'resumenParaAsesor'>
 }
 
-const SUGGESTIONS = ['¿Cuánto cuesta?', 'Necesito 10 unidades, ¿hay descuento?', '¿Cuánto tarda el envío?', 'Quiero hablar con un asesor']
+const SUGGESTIONS = ['¿Cuánto cuesta?', '¿Cuánto tarda el envío?', 'Quiero pedir una para mañana', 'Quiero hablar con un asesor']
 
 /**
  * Chat de prueba con la configuración guardada: muestra la respuesta, el lead score
@@ -24,7 +24,14 @@ export function BotTester() {
   const ask = useMutation({
     mutationFn: (history: Turn[]) => api.previewBot(history.map(({ role, content }) => ({ role, content }))),
     onSuccess: (answer) =>
-      setTurns((t) => [...t, { role: 'assistant', content: answer.respuesta, meta: { leadScore: answer.leadScore, requiereEscalamiento: answer.requiereEscalamiento } }]),
+      setTurns((t) => [
+        ...t,
+        {
+          role: 'assistant',
+          content: answer.respuesta,
+          meta: { leadScore: answer.leadScore, requiereEscalamiento: answer.requiereEscalamiento, resumenParaAsesor: answer.resumenParaAsesor },
+        },
+      ]),
     onError: (err) => setError(err.message),
   })
 
@@ -97,6 +104,11 @@ export function BotTester() {
                   </span>
                 )}
               </div>
+            )}
+            {t.meta?.requiereEscalamiento && t.meta.resumenParaAsesor && (
+              <p className="mt-1 max-w-[85%] rounded-lg bg-orange-50 px-2.5 py-1.5 text-[11px] text-orange-800 ring-1 ring-orange-100">
+                <span className="font-semibold">Resumen para el asesor:</span> {t.meta.resumenParaAsesor}
+              </p>
             )}
           </div>
         ))}

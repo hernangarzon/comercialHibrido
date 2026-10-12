@@ -24,6 +24,12 @@ El frontend vive en [frontend/](frontend/) (React + TypeScript + Vite + Tailwind
 - **Ajustes**: lista de puesta en marcha, equipo (invitar con contraseña temporal, roles, desactivar, restablecer contraseña), conexión del número de WhatsApp verificada contra Meta, y marca blanca (color y logo de la empresa aplicados a todo el panel).
 - **Plataforma**: solo para los dueños de la plataforma (`PLATFORM_ADMIN_EMAILS`). *Solicitudes* lista las demos pedidas en la landing y permite convertirlas en cliente (crea la empresa y su primer administrador con contraseña temporal). *Clientes* lista las empresas y permite darlas de alta o suspenderlas: una empresa suspendida no puede entrar al panel y el bot deja de atenderla.
 
+### Cuándo responde el bot y cuándo escala
+
+El bot atiende siempre: el cliente nunca queda esperando. Escala a un asesor (alerta en el panel + resumen del caso) solo cuando hay una **venta concreta** (el cliente quiere comprar, define cantidades o fecha, pregunta cómo pagar o confirma una cotización), cuando **pide hablar con una persona** o ante un **reclamo**. Un lead score alto o una pregunta que no sabe responder no escalan: el bot dice con honestidad lo que no sabe y sigue atendiendo.
+
+Mientras la conversación espera a un asesor, el bot sigue respondiendo sin repetir la alerta. Solo calla cuando un asesor **toma el control**; si ese asesor no escribe en `AGENT_HUMAN_IDLE_MINUTES` (30 por defecto), el bot retoma la conversación. Ante límites de uso del proveedor de IA (por ejemplo el plan gratuito de Groq) reintenta unos segundos después antes de recurrir al mensaje de cortesía.
+
 ### Ventana de 24 horas de WhatsApp
 
 Meta solo permite escribir texto libre hasta 24 horas después del último mensaje del cliente. Pasado ese plazo, el chat muestra la ventana como cerrada y ofrece las **plantillas aprobadas** de la cuenta de WhatsApp Business de la empresa (se leen de Meta en vivo; requieren el ID de la cuenta en Ajustes → WhatsApp). El asesor completa los datos de la plantilla, ve el mensaje final y lo envía; cuando el cliente responde, se reabre la ventana.

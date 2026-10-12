@@ -4,6 +4,7 @@ import com.comercialhibrido.domain.entity.Company;
 import com.comercialhibrido.domain.entity.Conversation;
 import com.comercialhibrido.domain.entity.Message;
 import com.comercialhibrido.domain.entity.Product;
+import com.comercialhibrido.domain.enums.ConversationStatus;
 import com.comercialhibrido.domain.enums.MessageSender;
 import com.comercialhibrido.dto.openai.OpenAiChatDtos.ChatMessage;
 import com.comercialhibrido.repository.MessageRepository;
@@ -39,11 +40,19 @@ public class ConversationContextBuilder {
         List<ChatMessage> mensajes = new ArrayList<>();
         mensajes.add(new ChatMessage("system", systemPrompt));
 
+        // Si ya se avisó a un asesor, el bot sigue atendiendo sin repetir la escalación.
+        if (conversation.getStatus() == ConversationStatus.ESCALADO_PENDIENTE) {
+            mensajes.add(new ChatMessage("system",
+                "Ya se avisó a un asesor humano que confirmará el pedido. Sigue atendiendo al cliente con normalidad: "
+                    + "responde sus dudas y, si pregunta por el asesor, dile que ya fue notificado y lo contactará pronto. "
+                    + "No vuelvas a marcar requiereEscalamiento salvo que haya un pedido o reclamo nuevo."));
+        }
+
         // 2. Inyectar resumen histórico previo si existe
         if (conversation.getSummary() != null && !conversation.getSummary().isBlank()) {
             mensajes.add(new ChatMessage(
                 "system",
-                "Resumen de conversaciones anteriores con este cliente: " + conversation.getSummary()
+                "Resumen del pedido o caso registrado para el asesor: " + conversation.getSummary()
             ));
         }
 
@@ -120,12 +129,17 @@ public class ConversationContextBuilder {
             ==================================================
             
             INSTRUCCIONES CLAVE DE VENTA:
-            1. VERACIDAD: Usa ÚNICAMENTE los precios, materiales, tiempos y características del catálogo oficial provisto arriba. NUNCA inventes productos ni precios.
-            2. TONO: Cercano, profesional, empático y conciso (recuerda que es WhatsApp).
-            3. AVANCE COMERCIAL: Responde la consulta con claridad y haz una pregunta de avance orientada a concretar el pedido o agendar el servicio.
-            4. ESCALAMIENTO A HUMANO:
-               Marca "requiereEscalamiento": true si el cliente solicita hablar con un asesor humano, pide un presupuesto personalizado no listado o presenta un reclamo.
-            5. LEAD SCORE: Califica de 0 a 100 el interés real de compra del cliente.
+            1. TÚ ATIENDES LA CONVERSACIÓN: responde siempre y lleva la venta lo más lejos que puedas. El cliente nunca debe quedar sin respuesta.
+            2. VERACIDAD: Usa ÚNICAMENTE los precios, materiales, tiempos y características del catálogo y la información de arriba. NUNCA inventes productos, precios, plazos ni condiciones. Si no tienes un dato, dilo con honestidad, ofrece lo que sí sabes y sigue ayudando.
+            3. TONO: Cercano, profesional, empático y conciso (recuerda que es WhatsApp).
+            4. AVANCE COMERCIAL: Responde con claridad y haz una pregunta de avance para concretar: cantidad, fecha, datos de entrega o forma de pago.
+            5. ESCALAMIENTO A UN ASESOR HUMANO. Marca "requiereEscalamiento": true ÚNICAMENTE en estos casos:
+               a) VENTA CONCRETA: el cliente expresa que quiere comprar o hacer un pedido. Señales claras: dice "quiero pedir", "lo quiero", "me lo llevo", "hagamos el pedido"; indica cantidades o fecha para su pedido; pregunta cómo pagar, a qué cuenta transferir o a dónde enviar; o confirma tras una cotización. Aunque tú respondas sus dudas (precio, plazo, medios de pago), MARCA el escalamiento para que un asesor cierre la venta.
+               b) El cliente pide expresamente hablar con una persona.
+               c) El cliente presenta un reclamo o una queja.
+               En cualquier otro caso (preguntas de precio, dudas, interés general, información que no tienes) NO escales: sigue atendiendo tú.
+               Cuando escales, en "respuesta" dile al cliente que un asesor confirmará su pedido en breve y sigue disponible para sus dudas; en "resumenParaAsesor" resume en una o dos frases qué quiere, cantidades, fecha y qué falta. Si no escalas, deja "resumenParaAsesor" vacío.
+            6. LEAD SCORE: Califica de 0 a 100 el interés real de compra del cliente.
             """.formatted(companyName, customerName, customPrompt, catalogo, politicasGenerales);
     }
     

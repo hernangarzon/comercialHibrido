@@ -38,6 +38,9 @@ public interface ConversationRepository extends JpaRepository<Conversation, UUID
 
     long countByCompanyId(UUID companyId);
 
+    /** Conversaciones en un estado, de todas las empresas (revisor de conversaciones abandonadas). */
+    List<Conversation> findByStatus(ConversationStatus status);
+
     /**
      * Empresa de una conversación, sin cargar la entidad (para enrutar eventos del panel).
      */

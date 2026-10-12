@@ -194,6 +194,8 @@ export interface BotAnswer {
   respuesta: string
   leadScore: number
   requiereEscalamiento: boolean
+  /** Resumen para el asesor cuando el bot escala; vacío en otro caso. */
+  resumenParaAsesor: string
 }
 
 export interface PreviewMessage {

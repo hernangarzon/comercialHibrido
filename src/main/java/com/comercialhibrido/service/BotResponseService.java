@@ -27,7 +27,6 @@ import java.util.UUID;
 public class BotResponseService {
 
     private static final Logger log = LoggerFactory.getLogger(BotResponseService.class);
-    private static final int UMBRAL_ESCALAMIENTO_POR_SCORE = 70;
     private static final String MENSAJE_FALLBACK =
         "Gracias por tu mensaje. Voy a transferir tu consulta a un asesor comercial para darte una atención personalizada.";
 
@@ -43,8 +42,15 @@ public class BotResponseService {
     public void generarYEncolarRespuesta(UUID conversationId) {
         Conversation conversation = conversationRepositoryReader.buscarConCliente(conversationId);
 
+        // Si un asesor tomó la conversación pero no responde, el bot la retoma:
+        // el cliente nunca debe quedar esperando.
+        Instant lastAgent = messageRepository.lastAgentMessageAtInConversation(conversationId);
+        if (conversationStateService.asesorInactivo(conversation, lastAgent, Instant.now())) {
+            conversationStateService.retomarPorInactividad(conversationId);
+        }
+
         if (!conversationStateService.debeResponderBot(conversation)) {
-            log.debug("Conversación {} en control humano, el bot no responde.", conversationId);
+            log.debug("Conversación {} en control de un asesor activo, el bot no responde.", conversationId);
             return;
         }
 
@@ -56,11 +62,11 @@ public class BotResponseService {
 
             persistirYEncolarSalida(conversation, answer.respuesta(), telefonoCliente);
 
-            boolean debeEscalar = Boolean.TRUE.equals(answer.requiereEscalamiento())
-                || (answer.leadScore() != null && answer.leadScore() >= UMBRAL_ESCALAMIENTO_POR_SCORE);
-
-            if (debeEscalar) {
-                conversationStateService.escalar(conversationId, answer.leadScore());
+            // Solo escala lo que el modelo marca como venta concreta, pedido de un humano o
+            // reclamo. Un score alto por sí solo no escala: el bot sigue atendiendo.
+            if (Boolean.TRUE.equals(answer.requiereEscalamiento())) {
+                int score = answer.leadScore() != null ? answer.leadScore() : conversation.getLeadScore();
+                conversationStateService.escalar(conversationId, score, answer.resumenParaAsesor());
             } else if (answer.leadScore() != null) {
                 // Antes el score solo se guardaba al escalar; el panel mostraba 0 en el resto.
                 conversation.setLeadScore(answer.leadScore());
@@ -72,7 +78,8 @@ public class BotResponseService {
 
             // Ante cualquier fallo del proveedor de IA, se envía mensaje de cortesía y se escala a humano
             persistirYEncolarSalida(conversation, MENSAJE_FALLBACK, telefonoCliente);
-            conversationStateService.escalar(conversationId, conversation.getLeadScore());
+            conversationStateService.escalar(conversationId, conversation.getLeadScore(),
+                "El bot no pudo responder (falla del proveedor de IA). Revisa la conversación.");
         }
     }
 

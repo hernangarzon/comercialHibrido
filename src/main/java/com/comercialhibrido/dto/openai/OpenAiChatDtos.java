@@ -43,6 +43,8 @@ public class OpenAiChatDtos {
     public record BotAnswer(
         String respuesta,
         Integer leadScore,
-        Boolean requiereEscalamiento
+        Boolean requiereEscalamiento,
+        /** Resumen para el asesor cuando se escala; vacío en otro caso. */
+        String resumenParaAsesor
     ) {}
 }

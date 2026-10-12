@@ -156,11 +156,16 @@ export function ChatView({ conversation, onBack, onToggleDetails, onSeen, onStat
           onSent={refresh}
         />
       ) : canReply ? (
-        <Composer
+        <>
+          <p className="border-t border-slate-200 bg-slate-50 px-4 py-1.5 text-[11px] text-slate-500">
+            Estás atendiendo tú: el bot no responde. Si pasan 30 minutos sin que escribas, el bot retoma la conversación para que el cliente no espere.
+          </p>
+          <Composer
           onSend={(text) => send.mutate(text)}
           agentName={session.name}
           companyId={session.companyId}
-        />
+          />
+        </>
       ) : (
         <div className="flex flex-col items-center justify-between gap-2 border-t border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 sm:flex-row">
           <p className="flex items-center gap-2">

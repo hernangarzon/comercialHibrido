@@ -59,6 +59,9 @@ public class Conversation {
     /** Momento de la última escalación a un asesor (métricas del dashboard). */
     private Instant escalatedAt;
 
+    /** Momento en que un asesor tomó el control (para devolverla al bot si no responde). */
+    private Instant takenAt;
+
     /**
      * Puntaje de intencion de compra (0-100) devuelto por el LLM de forma
      * estructurada en cada respuesta. Se usa para decidir si se dispara
