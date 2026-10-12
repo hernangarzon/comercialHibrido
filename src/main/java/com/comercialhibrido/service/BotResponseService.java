@@ -37,10 +37,15 @@ public class BotResponseService {
     private final OutboundMessageJobRepository outboundMessageJobRepository;
     private final ConversationStateService conversationStateService;
     private final ApplicationEventPublisher eventPublisher;
+    private final VoiceTranscriptionService voiceTranscriptionService;
 
     @Transactional
     public void generarYEncolarRespuesta(UUID conversationId) {
         Conversation conversation = conversationRepositoryReader.buscarConCliente(conversationId);
+
+        // Las notas de voz se transcriben siempre, aunque el bot no vaya a responder:
+        // así el asesor también lee lo que dijo el cliente.
+        voiceTranscriptionService.transcribirPendientes(conversation);
 
         // Si un asesor tomó la conversación pero no responde, el bot la retoma:
         // el cliente nunca debe quedar esperando.

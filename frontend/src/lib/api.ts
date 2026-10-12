@@ -25,7 +25,7 @@ export interface ChatMessage {
   id: string
   sender: Sender
   content: string
-  mediaType: 'TEXT' | 'IMAGE' | 'DOCUMENT' | 'TEMPLATE'
+  mediaType: 'TEXT' | 'IMAGE' | 'DOCUMENT' | 'TEMPLATE' | 'AUDIO'
   mediaId: string | null
   mediaFilename: string | null
   deliveryStatus: DeliveryStatus | null

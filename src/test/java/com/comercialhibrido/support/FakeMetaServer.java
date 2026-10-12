@@ -20,6 +20,8 @@ public class FakeMetaServer implements AutoCloseable {
     public static final String TOKEN = "token-valido";
     public static final String PHONE_ID = "1112223334445";
     public static final String WABA_ID = "222333444555";
+    /** Nota de voz disponible para descargar (como las que llegan por el webhook). */
+    public static final String AUDIO_MEDIA_ID = "audio-777";
 
     private final HttpServer server;
     private final List<String> sentPayloads = new CopyOnWriteArrayList<>();
@@ -53,6 +55,19 @@ public class FakeMetaServer implements AutoCloseable {
         if ("POST".equals(ex.getRequestMethod()) && path.endsWith("/messages")) {
             sentPayloads.add(new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
             reply(ex, 200, "{\"messaging_product\":\"whatsapp\",\"messages\":[{\"id\":\"wamid.fake-" + counter.incrementAndGet() + "\"}]}");
+            return;
+        }
+        if (path.equals("/" + AUDIO_MEDIA_ID)) {
+            reply(ex, 200, "{\"url\":\"" + baseUrl() + "/archivos/" + AUDIO_MEDIA_ID + "\",\"mime_type\":\"audio/ogg; codecs=opus\"}");
+            return;
+        }
+        if (path.equals("/archivos/" + AUDIO_MEDIA_ID)) {
+            byte[] audio = "OggS-nota-de-voz-simulada".getBytes(StandardCharsets.UTF_8);
+            ex.getResponseHeaders().add("Content-Type", "audio/ogg");
+            ex.sendResponseHeaders(200, audio.length);
+            try (OutputStream out = ex.getResponseBody()) {
+                out.write(audio);
+            }
             return;
         }
         if (path.equals("/" + WABA_ID + "/message_templates")) {

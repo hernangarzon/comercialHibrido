@@ -95,6 +95,11 @@ public class IncomingMessageService {
             mediaFilename = incomingMessage.document().filename();
             String caption = incomingMessage.document().caption();
             body = (caption != null && !caption.isBlank()) ? caption : "[Documento PDF recibido: " + (mediaFilename != null ? mediaFilename : "Archivo") + "]";
+        } else if ("audio".equalsIgnoreCase(incomingMessage.type()) && incomingMessage.audio() != null) {
+            // Se transcribe en el worker (VoiceTranscriptionService) para no demorar la respuesta a Meta.
+            mediaType = VoiceNotes.MEDIA_TYPE;
+            mediaId = incomingMessage.audio().id();
+            body = VoiceNotes.PENDING;
         } else if (incomingMessage.text() != null && incomingMessage.text().body() != null) {
             body = incomingMessage.text().body();
         } else {

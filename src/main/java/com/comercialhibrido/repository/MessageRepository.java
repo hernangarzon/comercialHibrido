@@ -46,6 +46,10 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
         """)
     Instant lastClientMessageAtInConversation(@Param("conversationId") UUID conversationId);
 
+    /** Notas de voz pendientes de transcribir en una conversación. */
+    List<Message> findByConversationIdAndSenderAndMediaTypeAndContent(
+        UUID conversationId, com.comercialhibrido.domain.enums.MessageSender sender, String mediaType, String content);
+
     /** Último mensaje de un asesor en una conversación (para detectar si dejó de atenderla). */
     @Query("""
         SELECT MAX(m.createdAt) FROM Message m

@@ -30,6 +30,10 @@ El bot atiende siempre: el cliente nunca queda esperando. Escala a un asesor (al
 
 Mientras la conversación espera a un asesor, el bot sigue respondiendo sin repetir la alerta. Solo calla cuando un asesor **toma el control**; si ese asesor no escribe en `AGENT_HUMAN_IDLE_MINUTES` (30 por defecto), el bot retoma la conversación. Ante límites de uso del proveedor de IA (por ejemplo el plan gratuito de Groq) reintenta unos segundos después antes de recurrir al mensaje de cortesía.
 
+### Notas de voz
+
+Los audios que envían los clientes se guardan al instante y el worker los transcribe con Whisper (`whisper-large-v3-turbo` en Groq, con la misma `OPENAI_API_KEY`) antes de que el bot responda. El bot contesta a lo que dijo el cliente y el asesor ve en el chat el reproductor del audio con la transcripción. Si un audio no se puede transcribir, el bot le pide al cliente que lo escriba. Configurable con `openai.transcription-model` y `openai.transcription-language` (por defecto `es`).
+
 ### Ventana de 24 horas de WhatsApp
 
 Meta solo permite escribir texto libre hasta 24 horas después del último mensaje del cliente. Pasado ese plazo, el chat muestra la ventana como cerrada y ofrece las **plantillas aprobadas** de la cuenta de WhatsApp Business de la empresa (se leen de Meta en vivo; requieren el ID de la cuenta en Ajustes → WhatsApp). El asesor completa los datos de la plantilla, ve el mensaje final y lo envía; cuando el cliente responde, se reabre la ventana.

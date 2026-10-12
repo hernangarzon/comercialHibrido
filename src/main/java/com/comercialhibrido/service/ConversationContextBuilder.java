@@ -63,7 +63,7 @@ public class ConversationContextBuilder {
 
         for (Message m : recientes) {
             String role = m.getSender() == MessageSender.CLIENTE ? "user" : "assistant";
-            mensajes.add(new ChatMessage(role, m.getContent()));
+            mensajes.add(new ChatMessage(role, contenidoParaElModelo(m)));
         }
 
         return mensajes;
@@ -80,6 +80,16 @@ public class ConversationContextBuilder {
             construirSystemPrompt(company, "Cliente de prueba", formatearCatalogoProductos(productos))));
         mensajes.addAll(historial);
         return mensajes;
+    }
+
+    /** Las notas de voz llegan al modelo como texto, indicando su origen. */
+    private static String contenidoParaElModelo(Message m) {
+        if (!VoiceNotes.MEDIA_TYPE.equals(m.getMediaType())) {
+            return m.getContent();
+        }
+        return VoiceNotes.isTranscribed(m.getContent())
+            ? "(Nota de voz) " + m.getContent()
+            : "[El cliente envió una nota de voz que no se pudo entender. Pídele amablemente que la escriba.]";
     }
 
     private String formatearCatalogoProductos(List<Product> productos) {

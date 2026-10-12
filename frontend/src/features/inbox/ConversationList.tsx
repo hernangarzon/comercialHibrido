@@ -171,7 +171,7 @@ function ConversationItem({
               {c.lastMessage ? (
                 <>
                   {prefix && <span className="text-slate-400">{prefix}</span>}
-                  {c.lastMessage}
+                  {c.lastMessage.startsWith('[Nota de voz') ? '🎤 Nota de voz' : c.lastMessage}
                 </>
               ) : (
                 <span className="italic">Sin mensajes</span>

@@ -33,12 +33,36 @@ public class FakeLlmServer implements AutoCloseable {
             throw new IllegalStateException(e);
         }
         server.createContext("/chat/completions", this::handle);
+        server.createContext("/audio/transcriptions", this::transcribe);
         server.start();
         respond("Hola, ¿en qué te ayudo?", 10, false, "");
     }
 
     public String baseUrl() {
         return "http://127.0.0.1:" + server.getAddress().getPort();
+    }
+
+    private final AtomicReference<String> transcription = new AtomicReference<>("Hola, quiero pedir dos coronas para el viernes");
+    private final List<String> transcriptionRequests = new CopyOnWriteArrayList<>();
+
+    /** Texto que devolverá Whisper para la próxima nota de voz. */
+    public void transcribeAs(String text) {
+        transcription.set(text);
+    }
+
+    /** Formularios multipart recibidos en /audio/transcriptions (como texto ISO-8859-1). */
+    public List<String> transcriptionRequests() {
+        return transcriptionRequests;
+    }
+
+    private void transcribe(HttpExchange ex) throws IOException {
+        transcriptionRequests.add(new String(ex.getRequestBody().readAllBytes(), StandardCharsets.ISO_8859_1));
+        byte[] bytes = JSON.writeValueAsBytes(Map.of("text", transcription.get()));
+        ex.getResponseHeaders().add("Content-Type", "application/json");
+        ex.sendResponseHeaders(200, bytes.length);
+        try (OutputStream out = ex.getResponseBody()) {
+            out.write(bytes);
+        }
     }
 
     /** Configura lo que "dirá" el modelo en la próxima llamada. */

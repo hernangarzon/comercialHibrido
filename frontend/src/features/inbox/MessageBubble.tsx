@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { AlertCircle, Bot, Check, CheckCheck, Clock, Download, FileText, ImageOff, X } from 'lucide-react'
+import { AlertCircle, Bot, Check, CheckCheck, Clock, Download, FileText, ImageOff, Mic, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api, type ChatMessage, type DeliveryStatus } from '../../lib/api'
 import { clockTime } from '../../lib/format'
@@ -29,7 +29,11 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
 
         {message.mediaId && <Attachment message={message} />}
 
-        {!isPlaceholder && <p className="leading-relaxed break-words whitespace-pre-wrap">{message.content}</p>}
+        {message.mediaType === 'AUDIO' ? (
+          <VoiceTranscript content={message.content} />
+        ) : (
+          !isPlaceholder && <p className="leading-relaxed break-words whitespace-pre-wrap">{message.content}</p>
+        )}
 
         <div className={clsx('mt-1 flex items-center justify-end gap-1 text-[10px]', fromClient ? 'text-slate-400' : 'text-white/75')}>
           {clockTime(message.createdAt)}
@@ -93,6 +97,28 @@ function useMediaUrl(mediaId: string) {
   return { url, failed }
 }
 
+// Debe coincidir con VoiceNotes del backend.
+const VOICE_PENDING = '[Nota de voz: transcribiendo…]'
+const VOICE_FAILED = '[Nota de voz sin transcribir]'
+
+/** Transcripción de una nota de voz, para que el asesor la lea sin escucharla. */
+function VoiceTranscript({ content }: { content: string }) {
+  if (content === VOICE_PENDING) {
+    return <p className="flex items-center gap-1.5 text-xs text-slate-500"><Mic className="size-3.5" /> Transcribiendo…</p>
+  }
+  if (content === VOICE_FAILED) {
+    return <p className="flex items-center gap-1.5 text-xs text-slate-500"><Mic className="size-3.5" /> No se pudo transcribir; escúchala arriba.</p>
+  }
+  return (
+    <div>
+      <p className="flex items-center gap-1 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
+        <Mic className="size-3" /> Transcripción
+      </p>
+      <p className="leading-relaxed break-words whitespace-pre-wrap italic">{content}</p>
+    </div>
+  )
+}
+
 function Attachment({ message }: { message: ChatMessage }) {
   const { url, failed } = useMediaUrl(message.mediaId!)
   const [zoom, setZoom] = useState(false)
@@ -102,6 +128,14 @@ function Attachment({ message }: { message: ChatMessage }) {
       <p className="my-1 flex items-center gap-1.5 text-xs opacity-80">
         <ImageOff className="size-4" /> No se pudo cargar el archivo
       </p>
+    )
+  }
+
+  if (message.mediaType === 'AUDIO') {
+    return url ? (
+      <audio controls preload="metadata" src={url} className="my-1 h-10 w-64 max-w-full" aria-label="Nota de voz del cliente" />
+    ) : (
+      <div className="my-1 h-10 w-64 max-w-full animate-pulse rounded-full bg-slate-200" />
     )
   }
 

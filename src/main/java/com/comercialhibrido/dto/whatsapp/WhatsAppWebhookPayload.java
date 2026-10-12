@@ -58,7 +58,9 @@ public record WhatsAppWebhookPayload(
         String type,
         TextBody text,
         MediaPayload image,
-        DocumentPayload document
+        DocumentPayload document,
+        /** Notas de voz y audios (type "audio"). */
+        MediaPayload audio
     ) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
