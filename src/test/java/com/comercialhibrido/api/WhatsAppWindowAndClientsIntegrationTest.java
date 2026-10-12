@@ -241,7 +241,7 @@ class WhatsAppWindowAndClientsIntegrationTest {
     // ----------------------------------------------------------------- helpers
 
     private Conversation conversacion(Instant ultimoMensajeCliente) {
-        Customer customer = customerRepository.save(Customer.builder().phoneNumber("+57" + sufijo.hashCode()).displayName("Cliente").build());
+        Customer customer = customerRepository.save(Customer.builder().company(empresa).phoneNumber("+57" + sufijo.hashCode()).displayName("Cliente").build());
         Conversation conv = conversationRepository.save(Conversation.builder().company(empresa).customer(customer)
             .status(ConversationStatus.HUMANO_CONTROL).build());
         messageRepository.save(Message.builder().conversation(conv).sender(MessageSender.CLIENTE).content("Hola")

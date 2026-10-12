@@ -11,7 +11,10 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "customers")
+@Table(
+    name = "customers",
+    uniqueConstraints = @UniqueConstraint(name = "customers_company_phone_key", columnNames = {"company_id", "phone_number"})
+)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -24,11 +27,18 @@ public class Customer {
     private UUID id;
 
     /**
-     * Numero de telefono en formato E.164 (ej: +573001234567), tal como
-     * lo entrega el webhook de WhatsApp en el campo "wa_id". Es el
-     * identificador natural del cliente y debe ser unico.
+     * Empresa a la que le escribe. El mismo número que escribe a dos empresas son
+     * dos clientes distintos: sus datos e historial no se mezclan.
      */
-    @Column(nullable = false, unique = true)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "company_id", nullable = false)
+    private Company company;
+
+    /**
+     * Numero de telefono en formato E.164 (ej: +573001234567), tal como
+     * lo entrega el webhook de WhatsApp en el campo "wa_id". Unico dentro de cada empresa.
+     */
+    @Column(nullable = false)
     private String phoneNumber;
 
     /** Nombre de perfil de WhatsApp, informativo. El nombre real se captura al CRM cuando aplica. */

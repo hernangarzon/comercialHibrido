@@ -177,7 +177,7 @@ class BotBehaviorIntegrationTest {
     // ----------------------------------------------------------------- helpers
 
     private Conversation conversacion(ConversationStatus status) {
-        Customer customer = customerRepository.save(Customer.builder()
+        Customer customer = customerRepository.save(Customer.builder().company(empresa)
             .phoneNumber("+57" + UUID.randomUUID().toString().substring(0, 10)).displayName("Cliente").build());
         Conversation conv = conversationRepository.save(Conversation.builder().company(empresa).customer(customer)
             .status(status).build());

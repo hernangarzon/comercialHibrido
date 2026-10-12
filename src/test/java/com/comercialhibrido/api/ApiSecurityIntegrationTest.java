@@ -186,6 +186,27 @@ class ApiSecurityIntegrationTest {
     }
 
     @Test
+    void elMismoNumeroEscribiendoADosEmpresasSonDosClientesDistintos() throws Exception {
+        String from = "57" + Math.abs(UUID.randomUUID().hashCode());
+        for (Company destino : new Company[]{empresaA, empresaB}) {
+            String wamid = "wamid." + UUID.randomUUID();
+            byte[] body = ("""
+                {"entry":[{"changes":[{"value":{"metadata":{"phone_number_id":"%s"},
+                  "contacts":[{"wa_id":"%s","profile":{"name":"Cliente Compartido"}}],
+                  "messages":[{"from":"%s","id":"%s","type":"text","text":{"body":"Hola"}}]}}]}]}
+                """.formatted(destino.getWhatsappPhoneNumberId(), from, from, wamid)).getBytes(StandardCharsets.UTF_8);
+            mvc.perform(post("/webhook/whatsapp").contentType(MediaType.APPLICATION_JSON).content(body)
+                    .header("X-Hub-Signature-256", firmar(body)))
+                .andExpect(status().isOk());
+        }
+
+        assertThat(customerRepository.findByCompanyIdAndPhoneNumber(empresaA.getId(), from)).isPresent();
+        assertThat(customerRepository.findByCompanyIdAndPhoneNumber(empresaB.getId(), from)).isPresent();
+        assertThat(customerRepository.findByCompanyIdAndPhoneNumber(empresaA.getId(), from).orElseThrow().getId())
+            .isNotEqualTo(customerRepository.findByCompanyIdAndPhoneNumber(empresaB.getId(), from).orElseThrow().getId());
+    }
+
+    @Test
     void webhookDeEstadoActualizaLaEntregaDelMensaje() throws Exception {
         Message saliente = messageRepository.save(Message.builder().conversation(conversacionB)
             .sender(MessageSender.BOT).content("hola").whatsappMessageId("wamid.out-" + UUID.randomUUID()).build());
@@ -204,6 +225,29 @@ class ApiSecurityIntegrationTest {
 
         assertThat(messageRepository.findById(saliente.getId()).orElseThrow().getDeliveryStatus())
             .isEqualTo(DeliveryStatus.READ);
+    }
+
+    @Test
+    void healthRevisaLaBaseYAvisaSiElWorkerDejoDeProcesar() throws Exception {
+        mvc.perform(get("/health"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("UP"))
+            .andExpect(jsonPath("$.database").value("UP"));
+
+        // Un mensaje vencido hace 20 minutos sin procesar = worker detenido.
+        var atascado = inboundMessageJobRepository.save(com.comercialhibrido.domain.entity.InboundMessageJob.builder()
+            .whatsappMessageId("wamid.atascado-" + UUID.randomUUID())
+            .conversationId(conversacionB.getId())
+            .nextAttemptAt(Instant.now().minus(java.time.Duration.ofMinutes(20)))
+            .build());
+        try {
+            mvc.perform(get("/health"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.status").value("DEGRADED"))
+                .andExpect(jsonPath("$.stuckJobs").value(1));
+        } finally {
+            inboundMessageJobRepository.delete(atascado);
+        }
     }
 
     @Test
@@ -232,7 +276,7 @@ class ApiSecurityIntegrationTest {
     }
 
     private Conversation crearConversacion(Company company, String phone, ConversationStatus status) {
-        Customer customer = customerRepository.save(Customer.builder().phoneNumber(phone).displayName("Cliente").build());
+        Customer customer = customerRepository.save(Customer.builder().company(company).phoneNumber(phone).displayName("Cliente").build());
         return conversationRepository.save(Conversation.builder().company(company).customer(customer).status(status).build());
     }
 

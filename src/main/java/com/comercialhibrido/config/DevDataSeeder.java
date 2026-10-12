@@ -152,7 +152,7 @@ public class DevDataSeeder implements ApplicationRunner {
 
     private Conversation crearConversacion(Company company, String phone, String name, ConversationStatus status,
                                    int leadScore, Message... mensajes) {
-        Customer customer = customerRepository.save(Customer.builder()
+        Customer customer = customerRepository.save(Customer.builder().company(company)
             .phoneNumber(phone)
             .displayName(name)
             .build());
@@ -234,7 +234,7 @@ public class DevDataSeeder implements ApplicationRunner {
                     : escalada ? ConversationStatus.ESCALADO_PENDIENTE
                     : ConversationStatus.BOT_ACTIVO;
 
-                Customer customer = customerRepository.save(Customer.builder()
+                Customer customer = customerRepository.save(Customer.builder().company(company)
                     .phoneNumber(String.format("+57300555%04d", n))
                     .displayName(NOMBRES[n % NOMBRES.length])
                     .build());

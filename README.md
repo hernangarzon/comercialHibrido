@@ -107,6 +107,7 @@ El servicio `app` y PostgreSQL tienen `restart: unless-stopped`; los datos de Po
 | `WHATSAPP_APP_SECRET` | Secreto para verificar `X-Hub-Signature-256`. **Obligatorio**: sin él el webhook responde 403 a todo. |
 | `AGENT_JWT_SECRET` | Secreto para firmar los JWT del panel, mínimo 32 caracteres (`openssl rand -base64 48`). La app no arranca sin él. |
 | `AGENT_ENCRYPTION_KEY` | Clave AES-256 en base64 (`openssl rand -base64 32`) con la que se cifran los tokens de WhatsApp de cada empresa en la base. Sin ella se guardan sin cifrar (con advertencia en el log). **No cambiarla ni perderla**: los tokens cifrados dejarían de leerse. |
+| `SENTRY_DSN` | Opcional. DSN de un proyecto de Sentry para recibir los errores del API y del worker; vacío = desactivado. |
 | `PLATFORM_ADMIN_EMAILS` | Correos de los dueños de la plataforma: ven las solicitudes de la landing y el webhook a registrar en Meta. |
 | `SALES_WHATSAPP` | Número de ventas para el botón de WhatsApp de la landing. Vacío = sin botón. |
 | `PANEL_ALLOWED_ORIGINS` | Orígenes extra, separados por coma, para `/ws` si el panel vive en otro dominio. El mismo origen siempre se acepta. |
@@ -180,6 +181,10 @@ La base de datos es la fuente durable de trabajos; por eso el proceso puede rein
 | `GET` | `/health` | Health check del proceso HTTP. |
 | `GET` | `/webhook/whatsapp` | Verificación de callback de Meta. |
 | `POST` | `/webhook/whatsapp` | Recepción de mensajes y estados. |
+
+## Monitoreo
+
+`GET /health` revisa la base de datos y los mensajes en cola: responde `200` con `"status":"UP"`, o `503` si la base no contesta (`DOWN`) o si hay mensajes vencidos hace más de 10 minutos sin procesar, señal de que el worker se detuvo (`DEGRADED`). Configura un monitor gratuito (por ejemplo UptimeRobot) contra esa URL cada 5 minutos para recibir una alerta. Con `SENTRY_DSN` los errores llegan además a Sentry.
 
 ## Base de datos y migraciones
 

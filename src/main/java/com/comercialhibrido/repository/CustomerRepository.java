@@ -7,5 +7,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface CustomerRepository extends JpaRepository<Customer, UUID> {
-    Optional<Customer> findByPhoneNumber(String phoneNumber);
+    /** El cliente de esa empresa con ese número (el mismo número en otra empresa es otro cliente). */
+    Optional<Customer> findByCompanyIdAndPhoneNumber(UUID companyId, String phoneNumber);
 }

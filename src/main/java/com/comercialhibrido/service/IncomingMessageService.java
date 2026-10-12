@@ -50,9 +50,10 @@ public class IncomingMessageService {
             return Optional.empty();
         }
 
-        Customer customer = customerRepository.findByPhoneNumber(fromPhoneNumber)
+        Customer customer = customerRepository.findByCompanyIdAndPhoneNumber(company.getId(), fromPhoneNumber)
             .orElseGet(() -> customerRepository.save(
                 Customer.builder()
+                    .company(company)
                     .phoneNumber(fromPhoneNumber)
                     .displayName(profileName)
                     .build()

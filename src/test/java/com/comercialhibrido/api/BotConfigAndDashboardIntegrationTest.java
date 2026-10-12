@@ -209,7 +209,7 @@ class BotConfigAndDashboardIntegrationTest {
     }
 
     private Conversation conversacion(Company company, ConversationStatus status, int score, Instant createdAt) {
-        Customer customer = customerRepository.save(Customer.builder()
+        Customer customer = customerRepository.save(Customer.builder().company(company)
             .phoneNumber("+57" + UUID.randomUUID().toString().substring(0, 10)).displayName("Cliente").build());
         return conversationRepository.save(Conversation.builder().company(company).customer(customer)
             .status(status).leadScore(score).createdAt(createdAt).build());
