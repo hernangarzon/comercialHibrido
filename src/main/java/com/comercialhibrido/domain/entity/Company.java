@@ -32,7 +32,10 @@ public class Company {
     @Column(length = 50)
     private String whatsappBusinessAccountId;
 
-    @Column(length = 500)
+    /** Token propio de WhatsApp; en la base va cifrado (ver TokenCipher). */
+    @Convert(converter = EncryptedStringConverter.class)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(columnDefinition = "TEXT")
     private String whatsappAccessToken;
 
     @JdbcTypeCode(SqlTypes.VARCHAR)

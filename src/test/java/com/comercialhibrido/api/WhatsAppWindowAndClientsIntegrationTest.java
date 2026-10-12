@@ -16,6 +16,7 @@ import com.comercialhibrido.repository.MessageRepository;
 import com.comercialhibrido.repository.SalesLeadRepository;
 import com.comercialhibrido.repository.UserRepository;
 import com.comercialhibrido.security.PasswordService;
+import com.comercialhibrido.security.TokenCipher;
 import com.comercialhibrido.support.FakeMetaServer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -85,6 +86,8 @@ class WhatsAppWindowAndClientsIntegrationTest {
     @Autowired MessageRepository messageRepository;
     @Autowired SalesLeadRepository salesLeadRepository;
     @Autowired PasswordService passwordService;
+    @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
+    @Autowired com.comercialhibrido.config.EncryptExistingTokensRunner encryptExistingTokensRunner;
 
     private Company empresa;
     private String admin;
@@ -106,6 +109,10 @@ class WhatsAppWindowAndClientsIntegrationTest {
 
         conectar(FakeMetaServer.PHONE_ID, FakeMetaServer.WABA_ID).andExpect(status().isOk())
             .andExpect(jsonPath("$.verification.verifiedName").value("Empresa de Prueba"));
+
+        // El token queda cifrado en la base, nunca en claro.
+        String guardado = jdbc.queryForObject("SELECT whatsapp_access_token FROM companies WHERE id = ?", String.class, empresa.getId());
+        assertThat(guardado).startsWith(TokenCipher.PREFIX).doesNotContain(FakeMetaServer.TOKEN);
 
         JsonNode plantillas = body(mvc.perform(get("/api/company/whatsapp/templates").header("Authorization", admin)).andExpect(status().isOk()));
         assertThat(plantillas).hasSize(2);
@@ -214,6 +221,21 @@ class WhatsAppWindowAndClientsIntegrationTest {
 
         JsonNode clientes = body(mvc.perform(get("/api/platform/companies").header("Authorization", plataforma)));
         assertThat(clientes.toString()).contains(lead.getCompanyName());
+    }
+
+    @Test
+    void alArrancarSeCifranLosTokensQueEstabanEnTextoPlano() throws Exception {
+        jdbc.update("UPDATE companies SET whatsapp_access_token = ? WHERE id = ?", "EAAGtokenViejoEnClaro", empresa.getId());
+
+        encryptExistingTokensRunner.run(null);
+
+        String guardado = jdbc.queryForObject("SELECT whatsapp_access_token FROM companies WHERE id = ?", String.class, empresa.getId());
+        assertThat(guardado).startsWith(TokenCipher.PREFIX).doesNotContain("EAAGtokenViejoEnClaro");
+        assertThat(companyRepository.findById(empresa.getId()).orElseThrow().getWhatsappAccessToken()).isEqualTo("EAAGtokenViejoEnClaro");
+
+        encryptExistingTokensRunner.run(null); // idempotente: no vuelve a cifrar lo ya cifrado
+        assertThat(jdbc.queryForObject("SELECT whatsapp_access_token FROM companies WHERE id = ?", String.class, empresa.getId()))
+            .isEqualTo(guardado);
     }
 
     // ----------------------------------------------------------------- helpers

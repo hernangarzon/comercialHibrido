@@ -106,6 +106,7 @@ El servicio `app` y PostgreSQL tienen `restart: unless-stopped`; los datos de Po
 | `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | Token de verificación usado por Meta en el GET del webhook. |
 | `WHATSAPP_APP_SECRET` | Secreto para verificar `X-Hub-Signature-256`. **Obligatorio**: sin él el webhook responde 403 a todo. |
 | `AGENT_JWT_SECRET` | Secreto para firmar los JWT del panel, mínimo 32 caracteres (`openssl rand -base64 48`). La app no arranca sin él. |
+| `AGENT_ENCRYPTION_KEY` | Clave AES-256 en base64 (`openssl rand -base64 32`) con la que se cifran los tokens de WhatsApp de cada empresa en la base. Sin ella se guardan sin cifrar (con advertencia en el log). **No cambiarla ni perderla**: los tokens cifrados dejarían de leerse. |
 | `PLATFORM_ADMIN_EMAILS` | Correos de los dueños de la plataforma: ven las solicitudes de la landing y el webhook a registrar en Meta. |
 | `SALES_WHATSAPP` | Número de ventas para el botón de WhatsApp de la landing. Vacío = sin botón. |
 | `PANEL_ALLOWED_ORIGINS` | Orígenes extra, separados por coma, para `/ws` si el panel vive en otro dominio. El mismo origen siempre se acepta. |
